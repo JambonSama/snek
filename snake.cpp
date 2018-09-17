@@ -20,6 +20,37 @@ SnakeGame::Direction SnakeGame::set_dir(Player &player, Direction d) {
     return d;
 }
 
+SnakeGame::Player::ID SnakeGame::add_player() {
+    Player::ID id = unique_player_id++;
+    players.insert({id, {}});
+    auto &player = players.at(id);
+    player.use_ai = true;
+    player.spawn_dir = Direction::Up;
+    player.color = get_random_color();
+
+    ++unique_player_id;
+    return id;
+}
+
+void SnakeGame::add_player(SnakeGame::Player::ID id) {
+    players.insert({id, {}});
+    auto &player = players.at(id);
+    player.use_ai = true;
+    player.spawn_dir = Direction::Up;
+    player.color = get_random_color();
+}
+
+void SnakeGame::recompute_spawn_points() {
+    auto n = players.size();
+    uint i = 0;
+    for (auto &p : players) {
+        p.second.spawnY = gridRows - 10;
+        p.second.spawnX = gridCols * i / n;
+        add_message("spawn pos: %d %d", p.second.spawnX, p.second.spawnY);
+        ++i;
+    }
+}
+
 void SnakeGame::spawn(Player &player) {
     //    paused = true;
     player.body.resize(initialSize);
@@ -71,7 +102,7 @@ void SnakeGame::reset_map() {
 }
 
 bool SnakeGame::on_player(Player &player, int x, int y) {
-
+    // TODO: Fix the test
     for (size_t i = 1; i < player.body.size(); ++i) {
         if (player.body[i].x == x && player.body[i].y == y) {
             return true;
@@ -81,7 +112,6 @@ bool SnakeGame::on_player(Player &player, int x, int y) {
 }
 
 void SnakeGame::init() {
-    players[local_id] = {};
     hand_font.loadFromFile("resources/fonts/act.ttf");
     pause_text.setFont(hand_font);
     pause_text.setCharacterSize(200);
@@ -111,68 +141,77 @@ void SnakeGame::init() {
     food_shape.setFillColor({0, 255, 0, 255});
     food_shape.setOrigin(-gridSize / 4, -gridSize / 4);
 
-    auto get_color = []() -> sf::Color {
-        sf::Color c;
-        c.r = rand() % 255;
-        c.g = rand() % 255;
-        c.b = 255 * 3 - c.r - c.b;
-        c.a = 255;
-        return c;
-    };
-
-    {
-        auto &player = players.at(local_id);
-        player.spawnX = gridCols / 2;
-        player.spawnY = gridRows / 2;
-        player.color = get_color();
-        spawn(player);
-    }
-    for (Player::ID id = 1; id < 10; id++) {
-        players[id] = {};
-        auto &player = players.at(id);
-        player.spawnX = rand() % (gridCols - 5) + 5;
-        player.spawnY = rand() % (gridRows - 5) + 5;
-        player.use_ai = true;
-        player.spawn_dir = static_cast<Direction>(rand() % 4);
-        player.color = get_color();
-        spawn(player);
-    }
-
-    //    {
-    //        players[2] = {};
-    //        auto &player = players.at(2);
-    //        player.spawnX = gridCols - 10;
-    //        player.spawnY = gridRows - 20;
-    //        player.use_ai = true;
-    //        player.color = get_color();
-    //        spawn(player);
-    //    }
-
-    add_message("Started Snake game with grid: %dx%d (%d)", gridCols, gridRows,
-                gridSize);
+    game_status = GameStatus::MainMenu;
 }
 
 void SnakeGame::input_key(sf::Keyboard::Key k, bool down) {
-    if (k == sf::Keyboard::P && down) {
-        paused = !paused;
-    } else if (k == sf::Keyboard::Space && down) {
-        boost = true;
-    } else if (k == sf::Keyboard::Space && !down) {
-        boost = false;
-    } else if (down) {
-        paused = false;
+    if (game_status == GameStatus::SinglePlayer) {
         auto &player = players.at(local_id);
-        player.input_buffer.emplace_back(k);
+        if (k == sf::Keyboard::P && down) {
+            paused = !paused;
+        } else if (k == sf::Keyboard::Space && down) {
+            player.boost = true;
+        } else if (k == sf::Keyboard::Space && !down) {
+            player.boost = false;
+        } else if (down) {
+            paused = false;
+            player.input_buffer.emplace_back(k);
+        }
     }
 }
 
 void SnakeGame::update(float dt) {
 
+    switch (game_status) {
+    case GameStatus::MainMenu: {
+        main_menu();
+    } break;
+    case GameStatus::SinglePlayer: {
+        single_player();
+    } break;
+    }
+}
+
+sf::Color SnakeGame::get_random_color() {
+    sf::Color c;
+    c.r = rand() % 255;
+    c.g = rand() % 255;
+    c.b = 255 * 3 - c.r - c.b;
+    c.a = 255;
+    return c;
+}
+
+void SnakeGame::main_menu() {
+    auto [w, h] = window->getView().getSize();
+    const int N = 5;
+    if (ui::push_button(w / 2, 1 * h / (N + 1), "Single Player",
+                        ui::Align::Center)) {
+        players.clear();
+        game_status = GameStatus::SinglePlayer;
+        add_player(local_id);
+        for (int i = 0; i < 20; i++)
+            add_player();
+        auto &player = players.at(local_id);
+        player.use_ai = false;
+
+        recompute_spawn_points();
+        for (auto &[id, player] : players)
+            spawn(player);
+    }
+    ui::push_button(w / 2, 2 * h / (N + 1), "Multi Player", ui::Align::Center);
+    ui::push_button(w / 2, 3 * h / (N + 1), "Host", ui::Align::Center);
+    ui::push_button(w / 2, 4 * h / (N + 1), "Connect", ui::Align::Center);
+    if (ui::push_button(w / 2, 5 * h / (N + 1), "Quit", ui::Align::Center)) {
+        window->close();
+    }
+}
+
+void SnakeGame::single_player() {
     network.update();
 
-    int div = boost ? 0 : 1;
-    if (!paused && moveCounter++ >= moveDelay * div) {
-        for (auto &[id, player] : players) {
+    for (auto &[id, player] : players) {
+        int div = player.boost ? 0 : 1;
+        if (!paused && player.moveCounter++ >= player.moveDelay * div) {
             if (!player.input_buffer.empty()) {
                 auto k = player.input_buffer.front();
                 player.input_buffer.pop_front();
@@ -255,7 +294,7 @@ void SnakeGame::update(float dt) {
                 player.body[0].x++;
                 break;
             }
-            moveCounter = 0;
+            player.moveCounter = 0;
 
             foodRegrowCount++;
         }
@@ -328,15 +367,16 @@ void SnakeGame::update(float dt) {
         window->draw(pause_text);
     }
 
-    if (ui::push_button(0, 0, "Server")) {
-        network.start_server();
-    }
-    if (ui::push_button(0, 25, "Client")) {
-        network.connect();
-    }
+    //    if (ui::push_button(0, 0, "Server")) {
+    //        network.start_server();
+    //    }
+    //    if (ui::push_button(0, 25, "Client")) {
+    //        network.connect();
+    //    }
 
-    auto &player = players.at(local_id);
-    ui::label(200, 5, "Score: %4d", player.body.size() - initialSize);
+    //    auto &player = players.at(local_id);
+    //    ui::label(200, 5, "Score: %4d", player.body.size() - initialSize);
 
-    player.use_ai = ui::toggle_button(0, 50, "Snake AI");
+    //    if(players.size() > 0)
+    //    player.use_ai = ui::toggle_button(0, 50, "Snake AI");
 }

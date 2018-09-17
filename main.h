@@ -43,6 +43,8 @@ void add_message(std::string fmt, ...);
 
 namespace ui {
 
+enum class Align { Left, Right, Center };
+
 struct PushButton {
     int x;
     int y;
@@ -61,7 +63,8 @@ struct ToggleButton {
 };
 
 void label(int x, int y, const std::string &fmt, ...);
-bool push_button(int x, int y, const std::string &label);
+bool push_button(int x, int y, const std::string &label,
+                 ui::Align h_align = ui::Align::Left);
 bool toggle_button(int x, int y, const std::string &label);
 void display(sf::RenderWindow *window);
 

@@ -30,12 +30,20 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
+    enum class GameStatus { MainMenu, SinglePlayer };
+    GameStatus game_status;
+
     struct Player {
         sf::Color color;
         std::vector<sf::Vector2i> body;
         Direction dir;
         std::list<sf::Keyboard::Key> input_buffer;
         bool use_ai = false;
+        bool boost = false;
+
+        int moveDelay = 2;
+        int moveCounter = 0;
+
         uint spawnX;
         uint spawnY;
         Direction spawn_dir;
@@ -65,6 +73,7 @@ struct SnakeGame {
     };
 
     Player::ID local_id = 0;
+    Player::ID unique_player_id = 1;
 
     std::unordered_map<Player::ID, Player> players;
 
@@ -75,9 +84,6 @@ struct SnakeGame {
     uint gridRows = 30;
     uint gridCols = 30;
 
-    int moveDelay = 2;
-    int moveCounter = 0;
-
     int foodRegrow = 20;
     int foodRegrowCount = 0;
 
@@ -85,9 +91,6 @@ struct SnakeGame {
     uint initialSize = 3;
 
     bool paused = false;
-
-    bool boost = false;
-
     bool hasMovedAfterDirectionChange = false;
 
     //    std::vector<sf::Vector2i> body;
@@ -95,7 +98,9 @@ struct SnakeGame {
     Direction set_dir(Player &player, Direction d);
 
     //    Direction dir;
-
+    Player::ID add_player();
+    void add_player(Player::ID id);
+    void recompute_spawn_points();
     void spawn(Player &player);
 
     // leave food behind where your body was
@@ -110,4 +115,9 @@ struct SnakeGame {
 
     void input_key(sf::Keyboard::Key k, bool down);
     void update(float dt);
+
+    sf::Color get_random_color();
+
+    void main_menu();
+    void single_player();
 };

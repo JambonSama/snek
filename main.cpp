@@ -46,7 +46,7 @@ std::unordered_map<std::string, PushButton> push_button_map;
 std::unordered_map<std::string, ToggleButton> toggle_button_map;
 sf::Text label_text;
 
-bool push_button(int x, int y, const std::string &label) {
+bool push_button(int x, int y, const std::string &label, Align h_align) {
 
     PushButton *button;
     if (auto it = push_button_map.find(label); it != push_button_map.end()) {
@@ -60,6 +60,16 @@ bool push_button(int x, int y, const std::string &label) {
         button->label.setString(label);
         button->label.setFont(message_font);
         button->label.setCharacterSize(30);
+        if (h_align == Align::Left) {
+            const auto BB = button->label.getLocalBounds();
+            button->label.setOrigin(0, 0);
+        } else if (h_align == Align::Center) {
+            const auto BB = button->label.getLocalBounds();
+            button->label.setOrigin(BB.width / 2, 0);
+        } else if (h_align == Align::Right) {
+            const auto BB = button->label.getLocalBounds();
+            button->label.setOrigin(BB.width, 0);
+        }
     }
 
     assert(button);
@@ -218,7 +228,7 @@ void draw_messages() {
 int main() {
     SnakeGame snake;
 
-    window = new sf::RenderWindow({1900, 1000}, "Games");
+    window = new sf::RenderWindow({800, 600}, "Games");
     window->setVerticalSyncEnabled(true);
 
     message_font.loadFromFile("resources/fonts/Inconsolata-Regular.ttf");
