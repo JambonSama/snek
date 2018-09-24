@@ -42,9 +42,11 @@ namespace ui {
 
 float PushButton::PRESS_TIMER = 0.2f;
 
+namespace {
 std::unordered_map<std::string, PushButton> push_button_map;
 std::unordered_map<std::string, ToggleButton> toggle_button_map;
 sf::Text label_text;
+} // namespace
 
 bool push_button(int x, int y, const std::string &label, Align h_align) {
 
@@ -61,7 +63,6 @@ bool push_button(int x, int y, const std::string &label, Align h_align) {
         button->label.setFont(message_font);
         button->label.setCharacterSize(30);
         if (h_align == Align::Left) {
-            const auto BB = button->label.getLocalBounds();
             button->label.setOrigin(0, 0);
         } else if (h_align == Align::Center) {
             const auto BB = button->label.getLocalBounds();
@@ -156,12 +157,12 @@ bool toggle_button(int x, int y, const std::string &label) {
     return button->active;
 }
 
-void label(int x, int y, const std::string &fmt, ...) {
+template <typename... T>
+void label(int x, int y, const std::string &fmt, T... args) {
     static char buffer[255];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buffer, sizeof(buffer), fmt.c_str(), args);
-    va_end(args);
+
+    snprintf(buffer, sizeof(buffer), fmt.c_str(), args...);
+
     label_text.setFillColor({255, 255, 255, 255});
     label_text.setCharacterSize(message_character_size);
     label_text.setString(buffer);
@@ -317,12 +318,11 @@ void add_message(std::string fmt, ...) {
 
     std::ostringstream oss;
     //    oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
-    oss << std::put_time(&tm, "[%H:%M:%S] ");
-    auto time_str = oss.str();
-    fmt = time_str + fmt;
+    oss << std::put_time(&tm, "[%H:%M:%S] ") << fmt;
+
     va_list args;
     va_start(args, fmt);
-    vsprintf(buffer, fmt.c_str(), args);
+    vsnprintf(buffer, sizeof(buffer), oss.str().c_str(), args);
     va_end(args);
     messages.emplace_front(buffer);
     if (messages.size() > max_message) {

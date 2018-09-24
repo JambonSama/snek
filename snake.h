@@ -49,6 +49,7 @@ struct SnakeGame {
         Direction spawn_dir;
 
         using ID = uint8_t;
+        ID id;
     };
 
     struct Message {
@@ -109,7 +110,8 @@ struct SnakeGame {
     void remove_food(int x, int y);
     void reset_map();
 
-    bool on_player(Player &player, int x, int y);
+    bool on_player(const Player &p1, const Player &p2);
+    bool on_player(const Player &p1, const Player &p2, int x, int y);
 
     void init();
 

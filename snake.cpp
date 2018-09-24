@@ -27,6 +27,7 @@ SnakeGame::Player::ID SnakeGame::add_player() {
     player.use_ai = true;
     player.spawn_dir = Direction::Up;
     player.color = get_random_color();
+    player.id = id;
 
     ++unique_player_id;
     return id;
@@ -38,6 +39,7 @@ void SnakeGame::add_player(SnakeGame::Player::ID id) {
     player.use_ai = true;
     player.spawn_dir = Direction::Up;
     player.color = get_random_color();
+    player.id = id;
 }
 
 void SnakeGame::recompute_spawn_points() {
@@ -101,10 +103,15 @@ void SnakeGame::reset_map() {
     //    }
 }
 
-bool SnakeGame::on_player(Player &player, int x, int y) {
-    // TODO: Fix the test
-    for (size_t i = 1; i < player.body.size(); ++i) {
-        if (player.body[i].x == x && player.body[i].y == y) {
+bool SnakeGame::on_player(const Player &p1, const Player &p2) {
+    return on_player(p1, p2, p1.body[0].x, p1.body[0].y);
+}
+
+bool SnakeGame::on_player(const Player &p1, const Player &p2, int x, int y) {
+
+    const size_t i0 = p1.id == p2.id ? 1 : 0;
+    for (size_t i = i0; i < p2.body.size(); ++i) {
+        if (p2.body[i].x == x && p2.body[i].y == y) {
             return true;
         }
     }
@@ -264,7 +271,7 @@ void SnakeGame::single_player() {
 
                     bool collision = false;
                     for (auto &[id_test, player_test] : players) {
-                        if (on_player(player_test, tx, ty)) {
+                        if (on_player(player, player_test, tx, ty)) {
                             collision = true;
                             break;
                         }
@@ -349,7 +356,7 @@ void SnakeGame::single_player() {
 
         bool collision = false;
         for (auto &[id_test, player_test] : players) {
-            if (on_player(player_test, player.body[0].x, player.body[0].y)) {
+            if (on_player(player, player_test)) {
                 collision = true;
                 break;
             }
