@@ -1,7 +1,8 @@
 #pragma once
+#include "stable.hpp"
 #include "main.h"
 #include "network.h"
-#include "stable.hpp"
+
 
 struct SnakeGame {
     int gridSize = 16;
@@ -52,8 +53,8 @@ struct SnakeGame {
         int moveDelay = 2;
         int moveCounter = 0;
 
-        uint spawnX;
-        uint spawnY;
+        u32 spawnX;
+        u32 spawnY;
         Direction spawn_dir;
 
         using ID = uint8_t;
@@ -90,14 +91,14 @@ struct SnakeGame {
 
     std::vector<Food *> food;
 
-    uint gridRows = 30;
-    uint gridCols = 30;
+	u32 gridRows = 30;
+	u32 gridCols = 30;
 
     int foodRegrow = 20;
     int foodRegrowCount = 0;
 
     int foodGrowth = 1;
-    uint initialSize = 3;
+	u32 initialSize = 3;
 
     bool paused = false;
     bool hasMovedAfterDirectionChange = false;

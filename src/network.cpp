@@ -1,3 +1,4 @@
+#include "stable.hpp"
 #include "network.h"
 #include "main.h"
 

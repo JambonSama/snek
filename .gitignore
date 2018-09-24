@@ -71,3 +71,5 @@ Thumbs.db
 *.dll
 *.exe
 
+/vs/.vs/snek/v15
+/vs/x64/Debug/snek.tlog

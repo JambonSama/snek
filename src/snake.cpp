@@ -1,3 +1,4 @@
+#include "stable.hpp"
 #include "snake.h"
 #include "main.h"
 
@@ -44,7 +45,7 @@ void SnakeGame::add_player(SnakeGame::Player::ID id) {
 
 void SnakeGame::recompute_spawn_points() {
     auto n = players.size();
-    uint i = 0;
+    u32 i = 0;
     for (auto &p : players) {
         p.second.spawnY = gridRows - 10;
         p.second.spawnX = gridCols * i / n;
@@ -209,8 +210,8 @@ void SnakeGame::main_menu() {
         players.clear();
         game_status = GameStatus::SinglePlayer;
         add_player(local_id);
-        for (int i = 0; i < 20; i++)
-            add_player();
+        /*for (int i = 0; i < 20; i++)
+            add_player();*/
         auto &player = players.at(local_id);
         player.use_ai = false;
 

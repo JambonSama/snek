@@ -1,7 +1,20 @@
+#include "stable.hpp"
 #include "main.h"
 #include "network.h"
 #include "snake.h"
-#include <stable.hpp>
+
+#ifdef _WIN32
+#ifdef _DEBUG
+#pragma comment(lib, "sfml-graphics-d.lib")
+#pragma comment(lib, "sfml-system-d.lib")
+#pragma comment(lib, "sfml-window-d.lib")
+#else
+#pragma comment(lib, "sfml-graphics.lib")
+#pragma comment(lib, "sfml-system.lib")
+#pragma comment(lib, "sfml-window.lib")
+#endif
+#endif
+
 
 sf::RenderWindow *window = nullptr;
 
@@ -10,8 +23,8 @@ namespace {
 sf::Font message_font;
 sf::Text message_text;
 
-uint message_character_size = 14;
-uint max_message = 10;
+u32 message_character_size = 14;
+u32 max_message = 10;
 bool console_input_focused = false;
 std::string console_input_text;
 sf::RectangleShape console_input_rectangle;
@@ -232,7 +245,8 @@ int main() {
     SnakeGame snake;
 
     window = new sf::RenderWindow({800, 600}, "Games");
-    window->setVerticalSyncEnabled(true);
+	window->setFramerateLimit(60);
+    //window->setVerticalSyncEnabled(true);
 
     message_font.loadFromFile("resources/fonts/Inconsolata-Regular.ttf");
     message_text.setFont(message_font);
