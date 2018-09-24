@@ -62,7 +62,7 @@ struct ToggleButton {
     bool active = false;
 };
 
-void label(int x, int y, const std::string &fmt, ...);
+void label(int x, int y, std::string fmt, ...);
 bool push_button(int x, int y, const std::string &label,
                  ui::Align h_align = ui::Align::Left);
 bool toggle_button(int x, int y, const std::string &label);

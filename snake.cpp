@@ -65,6 +65,7 @@ void SnakeGame::spawn(Player &player) {
     }
 
     player.dir = player.spawn_dir;
+    player.dead = false;
 }
 
 // leave food behind where the body was
@@ -176,6 +177,18 @@ void SnakeGame::update(float dt) {
     case GameStatus::SinglePlayer: {
         single_player();
     } break;
+    case GameStatus::HostLobby: {
+        host_lobby();
+    } break;
+    case GameStatus::GuestLobby: {
+        guest_lobby();
+    } break;
+    case GameStatus::HostMultiPlayer: {
+        single_player();
+    } break;
+    case GameStatus::GuestMultiPlayer: {
+
+    } break;
     }
 }
 
@@ -190,7 +203,7 @@ sf::Color SnakeGame::get_random_color() {
 
 void SnakeGame::main_menu() {
     auto [w, h] = window->getView().getSize();
-    const int N = 5;
+    const int N = 4;
     if (ui::push_button(w / 2, 1 * h / (N + 1), "Single Player",
                         ui::Align::Center)) {
         players.clear();
@@ -204,12 +217,34 @@ void SnakeGame::main_menu() {
         recompute_spawn_points();
         for (auto &[id, player] : players)
             spawn(player);
-    }
-    ui::push_button(w / 2, 2 * h / (N + 1), "Multi Player", ui::Align::Center);
-    ui::push_button(w / 2, 3 * h / (N + 1), "Host", ui::Align::Center);
-    ui::push_button(w / 2, 4 * h / (N + 1), "Connect", ui::Align::Center);
-    if (ui::push_button(w / 2, 5 * h / (N + 1), "Quit", ui::Align::Center)) {
+    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "Host",
+                               ui::Align::Center)) {
+        network.start_server();
+        game_status = GameStatus::HostLobby;
+    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "Connect",
+                               ui::Align::Center)) {
+        network.connect();
+        game_status = GameStatus::GuestLobby;
+    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "Quit",
+                               ui::Align::Center)) {
         window->close();
+    }
+}
+
+void SnakeGame::host_lobby() {
+    ui::label(0, 0, "Hosting Game");
+    if (ui::push_button(250, 0, "Start")) {
+        game_status = GameStatus::HostMultiPlayer;
+    } else if (ui::push_button(400, 0, "Quit")) {
+        network.stop_server();
+        game_status = GameStatus::MainMenu;
+    }
+}
+
+void SnakeGame::guest_lobby() {
+    ui::label(0, 0, "Lobby");
+    if (ui::push_button(200, 0, "Quit")) {
+        game_status = GameStatus::MainMenu;
     }
 }
 
@@ -313,8 +348,7 @@ void SnakeGame::single_player() {
             add_message("You died! Do no try to go out of the playing field.\n"
                         "Final score: %d",
                         player.body.size() - 3);
-            decompose(player);
-            spawn(player);
+            player.dead = true;
         }
 
         for (auto f : food) {
@@ -365,6 +399,12 @@ void SnakeGame::single_player() {
             add_message("You died! Do no eat snakes.\n"
                         "Final score: %d",
                         player.body.size() - 3);
+            player.dead = true;
+        }
+    }
+
+    for (auto &[id, player] : players) {
+        if (player.dead) {
             decompose(player);
             spawn(player);
         }

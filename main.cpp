@@ -157,14 +157,16 @@ bool toggle_button(int x, int y, const std::string &label) {
     return button->active;
 }
 
-template <typename... T>
-void label(int x, int y, const std::string &fmt, T... args) {
+void label(int x, int y, std::string fmt, ...) {
     static char buffer[255];
+    va_list args;
+    va_start(args, fmt);
 
-    snprintf(buffer, sizeof(buffer), fmt.c_str(), args...);
+    vsnprintf(buffer, sizeof(buffer), fmt.c_str(), args);
+    va_end(args);
 
     label_text.setFillColor({255, 255, 255, 255});
-    label_text.setCharacterSize(message_character_size);
+    label_text.setCharacterSize(30);
     label_text.setString(buffer);
     label_text.setPosition(x, y);
     window->draw(label_text);

@@ -28,7 +28,11 @@ void Network::ConnectedClient::start_read() {
 }
 
 void Network::ConnectedClient::on_read(size_t size) {
-    add_message("Received %d bytes", size);
+    if (size != 0) {
+        add_message("Received %d bytes", size);
+    } else {
+        socket.close();
+    }
 }
 
 Network::Server::Server(net::io_context &ctx) : acceptor(ctx) {}
@@ -71,28 +75,30 @@ Network::Network()
 
 void Network::connect() {
     add_message("connecting to server");
-    {
-        state.emplace<Client>(ctx);
-        auto &client = std::get<Client>(state);
-        try {
-            net::connect(client.socket,
-                         client.resolver.resolve("localhost", "5678"));
-            add_message("connected to localhost");
-            std::string msg = "Hello Snake! Kacer kac kac FF";
 
-            //            net::async_write(client.socket, net::buffer(msg),
-            //                             [](auto ec, auto size) {});
-            auto n = net::write(client.socket, net::buffer(msg));
-            add_message("sent message, n = %d", n);
-        } catch (std::exception &e) {
-            add_message("Failed to connect: %s", e.what());
-            state.emplace<None>();
-        }
-    }
+    state.emplace<Client>(ctx);
+    auto &client = std::get<Client>(state);
+
+    net::async_connect(
+        client.socket, client.resolver.resolve("localhost", "5678"),
+        [&client](auto ec, auto endpoint) {
+            if (!ec) {
+                add_message("connected to localhost");
+                std::string msg = "Hello Snake! Kacer kac kac FF";
+
+                //            net::async_write(client.socket,
+                //            net::buffer(msg),
+                //                             [](auto ec, auto size) {});
+                auto n = net::write(client.socket, net::buffer(msg));
+                add_message("sent message, n = %d", n);
+            } else {
+                add_message("Failed to connect: %s", ec.message().c_str());
+            }
+        });
 }
 
 void Network::start_server() {
-    add_message("starting server...");
+
     try {
         state.emplace<Server>(ctx);
         auto &server = std::get<Server>(state);
@@ -105,17 +111,34 @@ void Network::start_server() {
         add_message("Failed to start server: %s", e.what());
         state.emplace<None>();
     }
+
+    add_message("Started server");
+}
+
+void Network::stop_server() {
+    try {
+        if (auto server = std::get_if<Server>(&state); server) {
+            state.emplace<None>();
+        }
+    } catch (std::exception &e) {
+        add_message("Exception while stopping server: %s", e.what());
+    }
+    add_message("Stopped server");
 }
 
 void Network::start_accept() {
-    auto &server = std::get<Server>(state);
-    //        auto new_socket = server.acceptor.accept();
-    //        add_message("A client has connected to the server!");
-    server.acceptor.async_accept(
-        [this](std::error_code, net::ip::tcp::socket socket) {
-            add_message("A client has connected to the server!");
-            auto &server = std::get<Server>(this->state);
-            server.clients.emplace_back(ctx, std::move(socket));
-            start_accept();
-        });
+    if (auto server = std::get_if<Server>(&state); server) {
+        server->acceptor.async_accept(
+            [this](std::error_code ec, net::ip::tcp::socket socket) {
+                if (auto server = std::get_if<Server>(&state); server) {
+                    if (!ec) {
+                        server->clients.emplace_back(ctx, std::move(socket));
+                        start_accept();
+
+                        add_message("A client has connected to the server!");
+                    } else {
+                    }
+                }
+            });
+    }
 }

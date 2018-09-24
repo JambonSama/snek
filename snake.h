@@ -30,7 +30,14 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
-    enum class GameStatus { MainMenu, SinglePlayer };
+    enum class GameStatus {
+        MainMenu,
+        SinglePlayer,
+        HostLobby,
+        GuestLobby,
+        HostMultiPlayer,
+        GuestMultiPlayer
+    };
     GameStatus game_status;
 
     struct Player {
@@ -40,6 +47,7 @@ struct SnakeGame {
         std::list<sf::Keyboard::Key> input_buffer;
         bool use_ai = false;
         bool boost = false;
+        bool dead = false;
 
         int moveDelay = 2;
         int moveCounter = 0;
@@ -121,5 +129,7 @@ struct SnakeGame {
     sf::Color get_random_color();
 
     void main_menu();
+    void host_lobby();
+    void guest_lobby();
     void single_player();
 };

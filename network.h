@@ -80,6 +80,7 @@ struct Network {
     void connect();
 
     void start_server();
+    void stop_server();
 
     void start_accept();
 };
