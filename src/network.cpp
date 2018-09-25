@@ -1,6 +1,6 @@
-#include "stable.hpp"
 #include "network.h"
 #include "main.h"
+#include "stable_win32.hpp"
 
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}
 
@@ -54,9 +54,7 @@ Network::Status Network::status() {
     }
 }
 
-void Network::update() {
-
-}
+void Network::update() {}
 
 Network::Network()
     : work(net::make_work_guard(ctx)), work_thread([this]() { ctx.run(); }) {
@@ -90,7 +88,7 @@ void Network::connect() {
 void Network::start_server() {
 
     try {
-        auto& server = state.emplace<Server>(ctx);
+        auto &server = state.emplace<Server>(ctx);
         server.endpoint = net::ip::tcp::endpoint(net::ip::tcp::v4(), 5678);
         server.acceptor.open(server.endpoint.protocol());
         server.acceptor.bind(server.endpoint);

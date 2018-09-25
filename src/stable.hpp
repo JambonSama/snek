@@ -1,25 +1,25 @@
-#pragma once
-
-#ifdef _WIN32
-
 // STD
 #include <algorithm>
 #include <chrono>
 #include <ctime>
-#pragma warning (push, 0)
+#ifdef _WIN32
+#pragma warning(push, 0)
 #include <experimental/net>
-#pragma warning (pop)
+#pragma warning(pop)
+#else
+#include <experimental/net>
+#endif
 
+#include <cstdarg>
+#include <cstdint>
 #include <iomanip>
 #include <iostream>
 #include <list>
 #include <mutex>
-#include <stdarg.h>
 #include <thread>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <cstdint>
 
 using std::cout;
 using std::endl;
@@ -32,8 +32,4 @@ using i32 = int32_t;
 using i64 = int64_t;
 
 // THIRD-PARTY
-#pragma warning (push, 0)
 #include <SFML/Graphics.hpp>
-#pragma warning (pop)
-
-#endif

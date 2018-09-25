@@ -1,8 +1,7 @@
 #pragma once
-#include "stable.hpp"
 #include "main.h"
 #include "network.h"
-
+#include "stable_win32.hpp"
 
 struct SnakeGame {
     int gridSize = 16;
@@ -31,20 +30,16 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
-	struct MainMenu {
+    struct MainMenu {};
 
-	};
+    struct SinglePlayer {};
 
-	struct SinglePlayer {
+    using GameState = std::variant<MainMenu, SinglePlayer>;
 
-	};
-
-	using GameState = std::variant<MainMenu, SinglePlayer>;
-
-	struct GameStateVisitor {
-		void operator()(MainMenu& s);
-		void operator()(SinglePlayer& s);
-	};
+    struct GameStateVisitor {
+        void operator()(MainMenu &s);
+        void operator()(SinglePlayer &s);
+    };
 
     enum class GameStatus {
         MainMenu,
@@ -106,14 +101,14 @@ struct SnakeGame {
 
     std::vector<Food *> food;
 
-	u32 gridRows = 30;
-	u32 gridCols = 30;
+    u32 gridRows = 30;
+    u32 gridCols = 30;
 
     int foodRegrow = 20;
     int foodRegrowCount = 0;
 
     int foodGrowth = 1;
-	u32 initialSize = 3;
+    u32 initialSize = 3;
 
     bool paused = false;
     bool hasMovedAfterDirectionChange = false;
@@ -139,12 +134,12 @@ struct SnakeGame {
 
     void init();
 
-    void update(Input& input, float dt);
+    void update(Input &input, float dt);
 
     sf::Color get_random_color();
 
-    void main_menu(Input& input, float dt);
-    void host_lobby(Input& input, float dt);
-    void guest_lobby(Input& input, float dt);
-    void single_player(Input& input, float);
+    void main_menu(Input &input, float dt);
+    void host_lobby(Input &input, float dt);
+    void guest_lobby(Input &input, float dt);
+    void single_player(Input &input, float);
 };

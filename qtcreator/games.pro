@@ -1,11 +1,11 @@
 TEMPLATE = app
-CONFIG += console c++1z link_pkgconfig
+CONFIG += console c++1z link_pkgconfig precompile_header
 CONFIG -= app_bundle
 CONFIG -= qt
 
 PKGCONFIG += sfml-all
-#PRECOMPILED_HEADER = stable.hpp
-INCLUDEPATH += networking-ts-impl/include
+PRECOMPILED_HEADER = ../src/stable.hpp
+INCLUDEPATH += ../networking-ts-impl/include
 LIBS += -lpthread -lclang
 
 #QMAKE_LINK += -fxray-instrument -fxray-instruction-threshold=1
@@ -13,13 +13,13 @@ LIBS += -lpthread -lclang
 
 
 SOURCES += \
-        main.cpp \
-    snake.cpp \
-    network.cpp
+        ../src/main.cpp \
+    ../src/snake.cpp \
+    ../src/network.cpp
 
 HEADERS += \
-    main.h \
-    snake.h \
-    network.h\
-    stable.hpp
+    ../src/main.h \
+    ../src/snake.h \
+    ../scr/network.h \
+    ../src/stable_win32.hpp
 

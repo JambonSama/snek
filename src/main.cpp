@@ -1,7 +1,7 @@
-#include "stable.hpp"
 #include "main.h"
 #include "network.h"
 #include "snake.h"
+#include "stable_win32.hpp"
 
 #ifdef _WIN32
 #ifdef _DEBUG
@@ -14,7 +14,6 @@
 #pragma comment(lib, "sfml-window.lib")
 #endif
 #endif
-
 
 sf::RenderWindow *window = nullptr;
 
@@ -245,8 +244,8 @@ int main() {
     SnakeGame snake;
 
     window = new sf::RenderWindow({800, 600}, "Games");
-	window->setFramerateLimit(60);
-    //window->setVerticalSyncEnabled(true);
+    window->setFramerateLimit(60);
+    // window->setVerticalSyncEnabled(true);
 
     message_font.loadFromFile("resources/fonts/Inconsolata-Regular.ttf");
     message_text.setFont(message_font);
@@ -257,11 +256,11 @@ int main() {
     auto tp1 = std::chrono::high_resolution_clock::now();
     auto tp2 = std::chrono::high_resolution_clock::now();
 
-	Input input;
+    Input input;
 
     while (window->isOpen()) {
         sf::Event ev;
-		input.clear();
+        input.clear();
 
         while (window->pollEvent(ev)) {
             if (ev.type == sf::Event::Closed) {
@@ -285,29 +284,28 @@ int main() {
                 }
             }
 
-			else if (ev.type == sf::Event::TextEntered) {
-				// printf("key = %d\n", ev.text.unicode);
-				auto code = ev.text.unicode;
+            else if (ev.type == sf::Event::TextEntered) {
+                // printf("key = %d\n", ev.text.unicode);
+                auto code = ev.text.unicode;
 
-				if (code == 13) {
-					console_input_focused = !console_input_focused;
-				}
-			}
-			else if (ev.type == sf::Event::LostFocus) {
-				input.push(Input::LostFocus{});
-				
+                if (code == 13) {
+                    console_input_focused = !console_input_focused;
+                }
+            } else if (ev.type == sf::Event::LostFocus) {
+                input.push(Input::LostFocus{});
+
             } else {
                 if (ev.type == sf::Event::KeyPressed) {
                     if (ev.key.code == sf::Keyboard::Q) {
                         window->close();
                     } else {
-						input.push(Input::KeyPressed{ ev.key.code });
+                        input.push(Input::KeyPressed{ev.key.code});
                     }
                 } else if (ev.type == sf::Event::KeyReleased) {
                     if (ev.key.code == sf::Keyboard::Q) {
                         //                        window->close();
                     } else {
-						input.push(Input::KeyReleased{ ev.key.code });
+                        input.push(Input::KeyReleased{ev.key.code});
                     }
                 }
             }

@@ -1,55 +1,41 @@
 #pragma once
-#include "stable.hpp"
+#include "stable_win32.hpp"
 extern sf::RenderWindow *window;
 
 struct Input {
-	
-	struct KeyPressed {
-		sf::Keyboard::Key key;
-	};
 
-	struct KeyReleased {
-		sf::Keyboard::Key key;
-	};
+    struct KeyPressed {
+        sf::Keyboard::Key key;
+    };
 
-	struct LostFocus {
+    struct KeyReleased {
+        sf::Keyboard::Key key;
+    };
 
-	};
+    struct LostFocus {};
 
-	using Event = std::variant<KeyPressed, KeyReleased, LostFocus>;
+    using Event = std::variant<KeyPressed, KeyReleased, LostFocus>;
 
-	std::vector<Event> events;
+    std::vector<Event> events;
 
-	template <typename T>
-	void push(const T& value) {
-		events.push_back(value);
-	}
+    template <typename T> void push(const T &value) { events.push_back(value); }
 
-	void clear() {
-		events.clear();
-	}
+    void clear() { events.clear(); }
 };
 
-template <typename T>
-class LinearInterpolator {
+template <typename T> class LinearInterpolator {
 private:
+    float from = 0;
+    float to = 0;
+    float value = 0;
 
-	float from = 0;
-	float to = 0;
-	float value = 0;
-	
 public:
-	void update(float dt) {
-		if (to > value) {
+    void update(float dt) {
+        if (to > value) {
+        }
+    }
 
-		}
-	}
-
-	void operator=(T v) {
-
-	}
-	
-
+    void operator=(T v) {}
 };
 
 struct Entity;
