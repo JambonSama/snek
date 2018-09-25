@@ -55,18 +55,7 @@ Network::Status Network::status() {
 }
 
 void Network::update() {
-    switch (status()) {
-    case Status::Client: {
-        //        auto &client = std::get<Client>(state);
-    } break;
-    case Status::Server: {
-        auto &server = std::get<Server>(state);
 
-    } break;
-    case Status::None: {
-
-    } break;
-    }
 }
 
 Network::Network()
@@ -101,8 +90,7 @@ void Network::connect() {
 void Network::start_server() {
 
     try {
-        state.emplace<Server>(ctx);
-        auto &server = std::get<Server>(state);
+        auto& server = state.emplace<Server>(ctx);
         server.endpoint = net::ip::tcp::endpoint(net::ip::tcp::v4(), 5678);
         server.acceptor.open(server.endpoint.protocol());
         server.acceptor.bind(server.endpoint);
@@ -118,7 +106,7 @@ void Network::start_server() {
 
 void Network::stop_server() {
     try {
-        if (auto server = std::get_if<Server>(&state); server) {
+        if (auto server = std::get_if<Server>(&state)) {
             state.emplace<None>();
         }
     } catch (std::exception &e) {
@@ -131,7 +119,7 @@ void Network::start_accept() {
     if (auto server = std::get_if<Server>(&state); server) {
         server->acceptor.async_accept(
             [this](std::error_code ec, net::ip::tcp::socket socket) {
-                if (auto server = std::get_if<Server>(&state); server) {
+                if (auto server = std::get_if<Server>(&state)) {
                     if (!ec) {
                         server->clients.emplace_back(ctx, std::move(socket));
                         start_accept();

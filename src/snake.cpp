@@ -256,7 +256,7 @@ void SnakeGame::single_player(Input& input, float dt) {
 
 	for (auto ev : input.events) {
 		auto& player = players.at(local_id);
-		if (auto e = std::get_if<Input::KeyPressed>(&ev); e) {
+		if (auto e = std::get_if<Input::KeyPressed>(&ev)) {
 			if (e->key == sf::Keyboard::Space) {
 				player.boost = true;
 			}
@@ -268,7 +268,7 @@ void SnakeGame::single_player(Input& input, float dt) {
 				paused = false;
 			}
 		}
-		else if (auto e = std::get_if<Input::KeyReleased>(&ev); e) {
+		else if (auto e = std::get_if<Input::KeyReleased>(&ev)) {
 			if (e->key == sf::Keyboard::Space) {
 				player.boost = false;
 			}
@@ -276,7 +276,7 @@ void SnakeGame::single_player(Input& input, float dt) {
 				
 			}
 		}
-		else if (auto e = std::get_if<Input::LostFocus>(&ev); e) {
+		else if (auto e = std::get_if<Input::LostFocus>(&ev)) {
 			paused = true;
 		}
 	}
@@ -456,4 +456,12 @@ void SnakeGame::single_player(Input& input, float dt) {
 
     //    if(players.size() > 0)
     //    player.use_ai = ui::toggle_button(0, 50, "Snake AI");
+}
+
+void SnakeGame::GameStateVisitor::operator()(MainMenu & s)
+{
+}
+
+void SnakeGame::GameStateVisitor::operator()(SinglePlayer & s)
+{
 }

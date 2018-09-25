@@ -31,6 +31,21 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
+	struct MainMenu {
+
+	};
+
+	struct SinglePlayer {
+
+	};
+
+	using GameState = std::variant<MainMenu, SinglePlayer>;
+
+	struct GameStateVisitor {
+		void operator()(MainMenu& s);
+		void operator()(SinglePlayer& s);
+	};
+
     enum class GameStatus {
         MainMenu,
         SinglePlayer,

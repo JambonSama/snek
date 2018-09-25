@@ -45,7 +45,7 @@ public:
 		}
 	}
 
-	operator=(T v) {
+	void operator=(T v) {
 
 	}
 	
