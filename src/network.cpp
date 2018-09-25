@@ -1,5 +1,5 @@
 #include "network.h"
-#include "main.h"
+#include "engine.h"
 #include "stable_win32.hpp"
 
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}

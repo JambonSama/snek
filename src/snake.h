@@ -1,10 +1,10 @@
 #pragma once
-#include "main.h"
+#include "engine.h"
 #include "network.h"
 #include "stable_win32.hpp"
 
 struct SnakeGame {
-    int gridSize = 16;
+    u32 gridSize = 16;
     sf::RectangleShape body_shape;
     sf::RectangleShape food_shape;
 
@@ -30,16 +30,16 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
-    struct MainMenu {};
+    struct MainMenu {
+        void update(Input &input, float dt);
+    };
 
-    struct SinglePlayer {};
+    struct SinglePlayer {
+        void update(Input &input, float dt);
+    };
 
     using GameState = std::variant<MainMenu, SinglePlayer>;
-
-    struct GameStateVisitor {
-        void operator()(MainMenu &s);
-        void operator()(SinglePlayer &s);
-    };
+    GameState state;
 
     enum class GameStatus {
         MainMenu,

@@ -1,5 +1,5 @@
 #include "snake.h"
-#include "main.h"
+#include "engine.h"
 #include "stable_win32.hpp"
 
 SnakeGame::Food::Food(int x, int y) : p(x, y) {}
@@ -48,7 +48,7 @@ void SnakeGame::recompute_spawn_points() {
     u32 i = 0;
     for (auto &p : players) {
         p.second.spawnY = gridRows - 10;
-        p.second.spawnX = gridCols * i / n;
+        p.second.spawnX = gridCols * (i + 1) / (n + 1);
         add_message("spawn pos: %d %d", p.second.spawnX, p.second.spawnY);
         ++i;
     }
@@ -173,6 +173,10 @@ void SnakeGame::init() {
 
 void SnakeGame::update(Input &input, float dt) {
 
+    //    if (auto s = std::get_if<MainMenu>(&state)) {
+    //        s->update(input, dt);
+    //    }
+
     switch (game_status) {
     case GameStatus::MainMenu: {
         main_menu(input, dt);
@@ -207,7 +211,7 @@ sf::Color SnakeGame::get_random_color() {
 void SnakeGame::main_menu(Input &input, float dt) {
     auto [w, h] = window->getView().getSize();
     const int N = 4;
-    if (ui::push_button(w / 2, 1 * h / (N + 1), "Single Player",
+    if (ui::push_button(w / 2, 1 * h / (N + 1), "MainMenu##Single Player",
                         ui::Align::Center)) {
         players.clear();
         game_status = GameStatus::SinglePlayer;
@@ -220,15 +224,15 @@ void SnakeGame::main_menu(Input &input, float dt) {
         recompute_spawn_points();
         for (auto &[id, player] : players)
             spawn(player);
-    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "Host",
+    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "MainMenu##Host",
                                ui::Align::Center)) {
         network.start_server();
         game_status = GameStatus::HostLobby;
-    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "Connect",
+    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "MainMenu##Connect",
                                ui::Align::Center)) {
         network.connect();
         game_status = GameStatus::GuestLobby;
-    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "Quit",
+    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "MainMenu##Quit",
                                ui::Align::Center)) {
         window->close();
     }
@@ -236,9 +240,9 @@ void SnakeGame::main_menu(Input &input, float dt) {
 
 void SnakeGame::host_lobby(Input &input, float dt) {
     ui::label(0, 0, "Hosting Game");
-    if (ui::push_button(250, 0, "Start")) {
+    if (ui::push_button(250, 0, "HostLobby##Start")) {
         game_status = GameStatus::HostMultiPlayer;
-    } else if (ui::push_button(400, 0, "Quit")) {
+    } else if (ui::push_button(400, 0, "HostLobby##Quit")) {
         network.stop_server();
         game_status = GameStatus::MainMenu;
     }
@@ -246,7 +250,7 @@ void SnakeGame::host_lobby(Input &input, float dt) {
 
 void SnakeGame::guest_lobby(Input &input, float dt) {
     ui::label(0, 0, "Lobby");
-    if (ui::push_button(200, 0, "Quit")) {
+    if (ui::push_button(200, 0, "GuestLobby##Quit")) {
         game_status = GameStatus::MainMenu;
     }
 }
@@ -451,3 +455,7 @@ void SnakeGame::single_player(Input &input, float dt) {
     //    if(players.size() > 0)
     //    player.use_ai = ui::toggle_button(0, 50, "Snake AI");
 }
+
+void SnakeGame::MainMenu::update(Input &input, float dt) {}
+
+void SnakeGame::SinglePlayer::update(Input &input, float dt) {}

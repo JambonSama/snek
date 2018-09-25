@@ -38,6 +38,29 @@ public:
     void operator=(T v) {}
 };
 
+class Timer {
+public:
+    Timer(float timeout) : timeout_(timeout) {}
+    bool operator()(float dt) {
+        value_ += dt;
+        if (value_ > timeout_) {
+            running_ = false;
+            return true;
+        }
+        return false;
+    }
+
+    void reset() {
+        running_ = true;
+        value_ = 0.0f;
+    }
+
+private:
+    bool running_ = true;
+    float value_ = 0.0f;
+    float timeout_ = 0.0f;
+};
+
 struct Entity;
 struct EntityID {
     using Index = size_t;

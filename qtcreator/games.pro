@@ -18,8 +18,8 @@ SOURCES += \
     ../src/network.cpp
 
 HEADERS += \
-    ../src/main.h \
     ../src/snake.h \
     ../scr/network.h \
-    ../src/stable_win32.hpp
+    ../src/stable_win32.hpp \
+    ../src/engine.h
 

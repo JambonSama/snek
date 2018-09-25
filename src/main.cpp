@@ -1,4 +1,4 @@
-#include "main.h"
+#include "engine.h"
 #include "network.h"
 #include "snake.h"
 #include "stable_win32.hpp"
@@ -62,7 +62,14 @@ sf::Text label_text;
 
 bool push_button(int x, int y, const std::string &label, Align h_align) {
 
-    PushButton *button;
+    PushButton *button = nullptr;
+    std::string display_name = label;
+
+    const auto pos = label.find("##");
+    if (pos != label.npos) {
+        display_name = label.substr(pos + 2);
+    }
+
     if (auto it = push_button_map.find(label); it != push_button_map.end()) {
         button = &it->second;
         button->x = x;
@@ -71,7 +78,7 @@ bool push_button(int x, int y, const std::string &label, Align h_align) {
         button = &push_button_map.insert({label, {}}).first->second;
         button->x = x;
         button->y = y;
-        button->label.setString(label);
+        button->label.setString(display_name);
         button->label.setFont(message_font);
         button->label.setCharacterSize(30);
         if (h_align == Align::Left) {
