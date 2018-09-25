@@ -257,8 +257,12 @@ int main() {
     auto tp1 = std::chrono::high_resolution_clock::now();
     auto tp2 = std::chrono::high_resolution_clock::now();
 
+	Input input;
+
     while (window->isOpen()) {
         sf::Event ev;
+		input.clear();
+
         while (window->pollEvent(ev)) {
             if (ev.type == sf::Event::Closed) {
                 window->close();
@@ -281,26 +285,29 @@ int main() {
                 }
             }
 
-            else if (ev.type == sf::Event::TextEntered) {
-                // printf("key = %d\n", ev.text.unicode);
-                auto code = ev.text.unicode;
+			else if (ev.type == sf::Event::TextEntered) {
+				// printf("key = %d\n", ev.text.unicode);
+				auto code = ev.text.unicode;
 
-                if (code == 13) {
-                    console_input_focused = !console_input_focused;
-                }
-
+				if (code == 13) {
+					console_input_focused = !console_input_focused;
+				}
+			}
+			else if (ev.type == sf::Event::LostFocus) {
+				input.push(Input::LostFocus{});
+				
             } else {
                 if (ev.type == sf::Event::KeyPressed) {
                     if (ev.key.code == sf::Keyboard::Q) {
                         window->close();
                     } else {
-                        snake.input_key(ev.key.code, true);
+						input.push(Input::KeyPressed{ ev.key.code });
                     }
                 } else if (ev.type == sf::Event::KeyReleased) {
                     if (ev.key.code == sf::Keyboard::Q) {
                         //                        window->close();
                     } else {
-                        snake.input_key(ev.key.code, false);
+						input.push(Input::KeyReleased{ ev.key.code });
                     }
                 }
             }
@@ -310,7 +317,7 @@ int main() {
         tp2 = std::chrono::high_resolution_clock::now();
         dt = std::chrono::duration<float>(tp2 - tp1).count();
         tp1 = tp2;
-        snake.update(dt);
+        snake.update(input, dt);
 
         draw_messages();
 

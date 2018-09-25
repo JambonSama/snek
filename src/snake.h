@@ -124,13 +124,12 @@ struct SnakeGame {
 
     void init();
 
-    void input_key(sf::Keyboard::Key k, bool down);
-    void update(float dt);
+    void update(Input& input, float dt);
 
     sf::Color get_random_color();
 
-    void main_menu();
-    void host_lobby();
-    void guest_lobby();
-    void single_player();
+    void main_menu(Input& input, float dt);
+    void host_lobby(Input& input, float dt);
+    void guest_lobby(Input& input, float dt);
+    void single_player(Input& input, float);
 };

@@ -2,6 +2,56 @@
 #include "stable.hpp"
 extern sf::RenderWindow *window;
 
+struct Input {
+	
+	struct KeyPressed {
+		sf::Keyboard::Key key;
+	};
+
+	struct KeyReleased {
+		sf::Keyboard::Key key;
+	};
+
+	struct LostFocus {
+
+	};
+
+	using Event = std::variant<KeyPressed, KeyReleased, LostFocus>;
+
+	std::vector<Event> events;
+
+	template <typename T>
+	void push(const T& value) {
+		events.push_back(value);
+	}
+
+	void clear() {
+		events.clear();
+	}
+};
+
+template <typename T>
+class LinearInterpolator {
+private:
+
+	float from = 0;
+	float to = 0;
+	float value = 0;
+	
+public:
+	void update(float dt) {
+		if (to > value) {
+
+		}
+	}
+
+	operator=(T v) {
+
+	}
+	
+
+};
+
 struct Entity;
 struct EntityID {
     using Index = size_t;

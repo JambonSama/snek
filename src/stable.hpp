@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#pragma warning (push, 0)
 #include <experimental/net>
+#pragma warning (pop)
+
 #include <iomanip>
 #include <iostream>
 #include <list>
@@ -29,6 +32,8 @@ using i32 = int32_t;
 using i64 = int64_t;
 
 // THIRD-PARTY
+#pragma warning (push, 0)
 #include <SFML/Graphics.hpp>
+#pragma warning (pop)
 
 #endif

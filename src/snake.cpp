@@ -74,6 +74,8 @@ void SnakeGame::decompose(Player &player) {
     for (size_t i = 1; i < player.body.size(); ++i) {
         add_food(player.body[i].x, player.body[i].y);
     }
+
+	player.input_buffer.clear();
 }
 
 void SnakeGame::add_food(int x, int y) {
@@ -153,42 +155,42 @@ void SnakeGame::init() {
     game_status = GameStatus::MainMenu;
 }
 
-void SnakeGame::input_key(sf::Keyboard::Key k, bool down) {
-    if (game_status == GameStatus::SinglePlayer) {
-        auto &player = players.at(local_id);
-        if (k == sf::Keyboard::P && down) {
-            paused = !paused;
-        } else if (k == sf::Keyboard::Space && down) {
-            player.boost = true;
-        } else if (k == sf::Keyboard::Space && !down) {
-            player.boost = false;
-        } else if (down) {
-            paused = false;
-            player.input_buffer.emplace_back(k);
-        }
-    }
-}
+//void SnakeGame::input_key_(sf::Keyboard::Key k, bool down) {
+//    if (game_status == GameStatus::SinglePlayer) {
+//        auto &player = players.at(local_id);
+//        if (k == sf::Keyboard::P && down) {
+//            paused = !paused;
+//        } else if (k == sf::Keyboard::Space && down) {
+//            player.boost = true;
+//        } else if (k == sf::Keyboard::Space && !down) {
+//            player.boost = false;
+//        } else if (down) {
+//            paused = false;
+//            player.input_buffer.emplace_back(k);
+//        }
+//    }
+//}
 
-void SnakeGame::update(float dt) {
+void SnakeGame::update(Input& input, float dt) {
 
     switch (game_status) {
     case GameStatus::MainMenu: {
-        main_menu();
+        main_menu(input, dt);
     } break;
     case GameStatus::SinglePlayer: {
-        single_player();
+        single_player(input, dt);
     } break;
     case GameStatus::HostLobby: {
-        host_lobby();
+        host_lobby(input, dt);
     } break;
     case GameStatus::GuestLobby: {
-        guest_lobby();
+        guest_lobby(input, dt);
     } break;
     case GameStatus::HostMultiPlayer: {
-        single_player();
+		game_status = GameStatus::MainMenu;
     } break;
     case GameStatus::GuestMultiPlayer: {
-
+		game_status = GameStatus::MainMenu;
     } break;
     }
 }
@@ -202,7 +204,7 @@ sf::Color SnakeGame::get_random_color() {
     return c;
 }
 
-void SnakeGame::main_menu() {
+void SnakeGame::main_menu(Input& input, float dt) {
     auto [w, h] = window->getView().getSize();
     const int N = 4;
     if (ui::push_button(w / 2, 1 * h / (N + 1), "Single Player",
@@ -232,7 +234,7 @@ void SnakeGame::main_menu() {
     }
 }
 
-void SnakeGame::host_lobby() {
+void SnakeGame::host_lobby(Input& input, float dt) {
     ui::label(0, 0, "Hosting Game");
     if (ui::push_button(250, 0, "Start")) {
         game_status = GameStatus::HostMultiPlayer;
@@ -242,21 +244,48 @@ void SnakeGame::host_lobby() {
     }
 }
 
-void SnakeGame::guest_lobby() {
+void SnakeGame::guest_lobby(Input& input, float dt) {
     ui::label(0, 0, "Lobby");
     if (ui::push_button(200, 0, "Quit")) {
         game_status = GameStatus::MainMenu;
     }
 }
 
-void SnakeGame::single_player() {
+void SnakeGame::single_player(Input& input, float dt) {
     network.update();
+
+	for (auto ev : input.events) {
+		auto& player = players.at(local_id);
+		if (auto e = std::get_if<Input::KeyPressed>(&ev); e) {
+			if (e->key == sf::Keyboard::Space) {
+				player.boost = true;
+			}
+			else if (e->key == sf::Keyboard::P) {
+				paused = !paused;
+			}
+			else {
+				player.input_buffer.push_back(e->key);
+				paused = false;
+			}
+		}
+		else if (auto e = std::get_if<Input::KeyReleased>(&ev); e) {
+			if (e->key == sf::Keyboard::Space) {
+				player.boost = false;
+			}
+			else {
+				
+			}
+		}
+		else if (auto e = std::get_if<Input::LostFocus>(&ev); e) {
+			paused = true;
+		}
+	}
 
     for (auto &[id, player] : players) {
         int div = player.boost ? 0 : 1;
         if (!paused && player.moveCounter++ >= player.moveDelay * div) {
             if (!player.input_buffer.empty()) {
-                auto k = player.input_buffer.front();
+				auto k = player.input_buffer.front();
                 player.input_buffer.pop_front();
                 if (k == sf::Keyboard::Left) {
                     player.dir = set_dir(player, Direction::Left);
