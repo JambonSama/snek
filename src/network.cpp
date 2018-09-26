@@ -2,6 +2,9 @@
 #include "engine.h"
 #include "stable_win32.hpp"
 
+static constexpr auto PORT = "5679";
+static constexpr auto PORTN = 5679;
+
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}
 
 Network::ConnectedClient::ConnectedClient(net::io_context &ctx,
@@ -30,7 +33,7 @@ void Network::connect() {
     auto &client = std::get<Client>(state);
 
     net::async_connect(
-        client.socket, client.resolver.resolve("localhost", "5678"),
+        client.socket, client.resolver.resolve("localhost", PORT),
         [&client](auto ec, auto endpoint) {
             if (!ec) {
                 add_message("connected to localhost");
@@ -46,7 +49,7 @@ void Network::start_server() {
 
     try {
         auto &server = state.emplace<Server>(ctx);
-        server.endpoint = net::ip::tcp::endpoint(net::ip::tcp::v4(), 5678);
+        server.endpoint = net::ip::tcp::endpoint(net::ip::tcp::v4(), PORTN);
         server.acceptor.open(server.endpoint.protocol());
         server.acceptor.bind(server.endpoint);
         server.acceptor.listen();

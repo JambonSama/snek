@@ -28,8 +28,12 @@ struct NewPlayer {
     bool ready;
 };
 
+struct PlayerLeft {
+    Network::ClientID id;
+};
+
 using Message = std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady,
-                             ServerSetReady, NewPlayer>;
+                             ServerSetReady, NewPlayer, PlayerLeft>;
 }; // namespace SnakeNetwork
 
 struct SnakeGame {

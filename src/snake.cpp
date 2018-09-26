@@ -127,22 +127,6 @@ void SnakeGame::init() {
     food_shape.setOrigin(-(int)gridSize / 4, -(int)gridSize / 4);
 }
 
-// void SnakeGame::input_key_(sf::Keyboard::Key k, bool down) {
-//    if (game_status == GameStatus::SinglePlayer) {
-//        auto &player = players.at(local_id);
-//        if (k == sf::Keyboard::P && down) {
-//            paused = !paused;
-//        } else if (k == sf::Keyboard::Space && down) {
-//            player.boost = true;
-//        } else if (k == sf::Keyboard::Space && !down) {
-//            player.boost = false;
-//        } else if (down) {
-//            paused = false;
-//            player.input_buffer.emplace_back(k);
-//        }
-//    }
-//}
-
 void SnakeGame::update(Input &input, float dt) {
 
     if (auto s = std::get_if<MainMenu>(&state)) {
@@ -164,36 +148,6 @@ sf::Color SnakeGame::get_random_color() {
     return color;
 }
 
-// void SnakeGame::main_menu(Input &input, float dt) {
-//    auto [w, h] = window->getView().getSize();
-//    const int N = 4;
-//    if (ui::push_button(w / 2, 1 * h / (N + 1), "MainMenu##Single Player",
-//                        ui::Align::Center)) {
-//        players.clear();
-//        game_status = GameStatus::SinglePlayer;
-//        add_player(local_id);
-//        /*for (int i = 0; i < 20; i++)
-//            add_player();*/
-//        auto &player = players.at(local_id);
-//        player.use_ai = false;
-//
-//        recompute_spawn_points();
-//        for (auto &[id, player] : players)
-//            spawn(player);
-//    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "MainMenu##Host",
-//                               ui::Align::Center)) {
-//        network.start_server();
-//        game_status = GameStatus::HostLobby;
-//    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "MainMenu##Connect",
-//                               ui::Align::Center)) {
-//        network.connect();
-//        game_status = GameStatus::GuestLobby;
-//    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "MainMenu##Quit",
-//                               ui::Align::Center)) {
-//        window->close();
-//    }
-//}
-//
 void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
     ui::label(5, 0, "Hosting Game");
     if (ui::push_button(250, 0, "HostLobby##Start")) {
@@ -227,36 +181,50 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
                     } else if (std::get_if<JoinRequest>(&msg)) {
                         msg.emplace<JoinResponse>(id);
                         player.send_buffer.write(msg);
+                        for (auto &[tid, tplayer] : s.players) {
+                            msg = NewPlayer{tid, tplayer.ready};
+                            player.send_buffer.write(msg);
+                            printf("Sharing player %u with %u\n", tid, id);
+                        }
+
+                        for (auto &[tid, tplayer] : s.players) {
+                            if (tid != id && tid != s.local_id) {
+                                msg = NewPlayer{id, player.ready};
+                                tplayer.send_buffer.write(msg);
+                                printf("Sharing player %u with %u\n", id, tid);
+                            }
+                        }
 
                     } else if (auto m = std::get_if<SetReady>(&msg)) {
                         player.ready = m->ready;
-                        bool ready = m->ready;
-                        msg = ServerSetReady{ready, id};
+                        msg = ServerSetReady{player.ready, id};
+                        printf("Sending to %u players\n", s.players.size());
                         for (auto &[tid, tplayer] : s.players) {
+                            printf(
+                                "Sending ServerSetReady (v=%d id=%u) to %u\n",
+                                player.ready, id, tid);
                             tplayer.send_buffer.write(msg);
                         }
                     }
                 }
-                if (player.known_ids.size() != s.players.size()) {
-                    for (auto &[tid, tplayer] : s.players) {
-                        if (std::find(player.known_ids.begin(),
-                                      player.known_ids.end(),
-                                      tid) == player.known_ids.end()) {
-                            msg = NewPlayer{tid, tplayer.ready};
-                            player.known_ids.push_back(tid);
-                            player.send_buffer.write(msg);
-                            printf("Sharing player id %u with %u\n", tid, id);
-                        }
-                    }
-                }
-                s.network.send(player.send_buffer, id);
+
                 ++it;
             } else {
+                auto erase_id = it->first;
                 it = s.players.erase(it);
+                Message msg;
+                msg = PlayerLeft{erase_id};
+                for (auto &[tid, tplayer] : s.players) {
+                    tplayer.send_buffer.write(msg);
+                }
             }
         } else {
             ++it;
         }
+    }
+
+    for (auto &[id, player] : s.players) {
+        s.network.send(player.send_buffer, id);
     }
 
     int y = 50;
@@ -280,7 +248,7 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
     if (bool ready; ui::toggle_button(250, 0, "Ready", &ready)) {
         msg = SetReady{ready};
         send_buffer.write(msg);
-        printf("Sending %s\n", ready ? "Ready" : "Not Ready");
+        //        printf("Sending %s\n", ready ? "Ready" : "Not Ready");
     }
     if (ui::push_button(400, 0, "GuestLobby##Quit")) {
         state.emplace<MainMenu>();
@@ -311,9 +279,12 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
                     auto p = s.add_player(m->id);
                     p->ready = m->ready;
                 } else if (auto m = std::get_if<ServerSetReady>(&msg)) {
-                    printf("Received ServerSetReady\n");
+                    printf("Received ServerSetReady (v=%d id=%d)\n", m->ready,
+                           m->id);
                     auto &p = s.players.at(m->id);
                     p.ready = m->ready;
+                } else if (auto m = std::get_if<PlayerLeft>(&msg)) {
+                    s.players.erase(m->id);
                 }
             }
         } else {
@@ -574,10 +545,14 @@ SnakeGame::GuestLobby::GuestLobby(SnakeGame &game) : game(game) {
 }
 
 SnakeGame::Player *SnakeGame::GuestLobby::add_player(Network::ClientID id) {
-    auto &player = players.emplace(id, Player{}).first->second;
-    player.spawn_dir = Direction::Up;
-    player.color = game.get_random_color();
-    player.id = id;
+    if (auto it = players.find(id); it != players.end()) {
+        return &it->second;
+    } else {
+        auto &player = players.emplace(id, Player{}).first->second;
+        player.spawn_dir = Direction::Up;
+        player.color = game.get_random_color();
+        player.id = id;
 
-    return &player;
+        return &player;
+    }
 }
