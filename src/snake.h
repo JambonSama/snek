@@ -3,6 +3,7 @@
 #include "network.h"
 #include "stable_win32.hpp"
 
+
 struct SnakeGame {
     u32 gridSize = 16;
     sf::RectangleShape body_shape;
@@ -10,8 +11,6 @@ struct SnakeGame {
 
     sf::Font hand_font;
     sf::Text pause_text;
-
-    Network network;
 
     struct Food {
         sf::Vector2i p;
@@ -30,49 +29,93 @@ struct SnakeGame {
     static constexpr Direction next_left[4] = {
         Direction::Left, Direction::Up, Direction::Right, Direction::Down};
 
+	struct Player {
+		sf::Color color;
+		std::vector<sf::Vector2i> body;
+		Direction dir;
+		std::list<sf::Keyboard::Key> input_buffer;
+		bool use_ai = false;
+		bool boost = false;
+		bool dead = false;
+
+		int moveDelay = 2;
+		int moveCounter = 0;
+
+		u32 spawnX;
+		u32 spawnY;
+		Direction spawn_dir;
+
+		using ID = uint8_t;
+		ID id;
+
+		u32 initialSize = 3;
+	};
+
     struct MainMenu {
-        void update(Input &input, float dt);
+       
     };
+
+	using PlayerList = std::unordered_map<Player::ID, Player>;
+	using WorldMap = Array2D<Cell>;
 
     struct SinglePlayer {
-        void update(Input &input, float dt);
+		SinglePlayer(SnakeGame& game);
+		void add_food(int x, int y);
+		void remove_food(int x, int y);
+		void reset_map();
+		void decompose(Player& player);
+		void spawn(Player& player);
+		void recompute_spawn_points();
+
+		Player* add_player();
+
+		Player::ID local_id = 0;
+		Player::ID unique_player_id = 0;
+
+		PlayerList players;
+		std::vector<Food *> food;
+		int foodRegrow = 20;
+		int foodRegrowCount = 0;
+
+		int foodGrowth = 1;
+		WorldMap world_map;
+		
+
+		bool paused = false;
+		SnakeGame& game;
     };
 
-    using GameState = std::variant<MainMenu, SinglePlayer>;
+	struct HostLobby {
+		HostLobby(SnakeGame& game);
+		Network network;
+		SnakeGame& game;
+
+		Player* add_player(Network::ClientID id);
+		std::unordered_map<Network::ClientID, Player> players;
+
+		Player::ID local_id = 0;
+		Player::ID unique_player_id = 1;
+	};
+
+	struct GuestLobby {
+		GuestLobby(SnakeGame& game);
+		Network network;
+		SnakeGame& game;
+
+		struct None {};
+		struct WaitingForId {};
+		struct Ready {
+			Ready(Player::ID id) : id(id) {}
+			const Player::ID id;
+		};
+		std::variant<None, WaitingForId, Ready> state;
+	};
+
+    using GameState = std::variant<MainMenu, SinglePlayer, HostLobby, GuestLobby>;
     GameState state;
-
-    enum class GameStatus {
-        MainMenu,
-        SinglePlayer,
-        HostLobby,
-        GuestLobby,
-        HostMultiPlayer,
-        GuestMultiPlayer
-    };
-    GameStatus game_status;
-
-    struct Player {
-        sf::Color color;
-        std::vector<sf::Vector2i> body;
-        Direction dir;
-        std::list<sf::Keyboard::Key> input_buffer;
-        bool use_ai = false;
-        bool boost = false;
-        bool dead = false;
-
-        int moveDelay = 2;
-        int moveCounter = 0;
-
-        u32 spawnX;
-        u32 spawnY;
-        Direction spawn_dir;
-
-        using ID = uint8_t;
-        ID id;
-    };
-
+	
     struct Message {
-        enum class Type { HeartBeat, RequestJoin, SetNewPlayer, PlayerJoined };
+        enum class Type: u8 { RequestJoin, SetNewPlayer };
 
         struct HeartBeat {};
 
@@ -89,45 +132,18 @@ struct SnakeGame {
 
         Type header;
 
-        std::variant<HeartBeat, RequestJoin, SetNewPlayer, PlayerJoined> body;
+		union {
+			RequestJoin request_join;
+			SetNewPlayer set_new_player;
+		} body;
     };
 
-    Player::ID local_id = 0;
-    Player::ID unique_player_id = 1;
-
-    std::unordered_map<Player::ID, Player> players;
-
-    Array2D<Cell> world_map;
-
-    std::vector<Food *> food;
 
     u32 gridRows = 30;
     u32 gridCols = 30;
 
-    int foodRegrow = 20;
-    int foodRegrowCount = 0;
-
-    int foodGrowth = 1;
-    u32 initialSize = 3;
-
-    bool paused = false;
-    bool hasMovedAfterDirectionChange = false;
-
-    //    std::vector<sf::Vector2i> body;
-
+	Network::Buffer buffer;
     Direction set_dir(Player &player, Direction d);
-
-    //    Direction dir;
-    Player::ID add_player();
-    void add_player(Player::ID id);
-    void recompute_spawn_points();
-    void spawn(Player &player);
-
-    // leave food behind where your body was
-    void decompose(Player &player);
-    void add_food(int x, int y);
-    void remove_food(int x, int y);
-    void reset_map();
 
     bool on_player(const Player &p1, const Player &p2);
     bool on_player(const Player &p1, const Player &p2, int x, int y);
@@ -136,10 +152,10 @@ struct SnakeGame {
 
     void update(Input &input, float dt);
 
-    sf::Color get_random_color();
+     sf::Color get_random_color();
 
-    void main_menu(Input &input, float dt);
-    void host_lobby(Input &input, float dt);
-    void guest_lobby(Input &input, float dt);
-    void single_player(Input &input, float);
+     void main_menu(MainMenu& s, Input &input, float dt);
+     void host_lobby(HostLobby& s, Input &input, float dt);
+     void guest_lobby(GuestLobby& s, Input &input, float dt);
+     void single_player(SinglePlayer& s, Input &input, float);
 };

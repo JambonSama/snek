@@ -1,7 +1,8 @@
+#include "stable_win32.hpp"
 #include "engine.h"
 #include "network.h"
 #include "snake.h"
-#include "stable_win32.hpp"
+
 
 #ifdef _WIN32
 #ifdef _DEBUG

@@ -21,42 +21,21 @@ SnakeGame::Direction SnakeGame::set_dir(Player &player, Direction d) {
     return d;
 }
 
-SnakeGame::Player::ID SnakeGame::add_player() {
-    Player::ID id = unique_player_id++;
-    players.insert({id, {}});
-    auto &player = players.at(id);
-    player.use_ai = true;
-    player.spawn_dir = Direction::Up;
-    player.color = get_random_color();
-    player.id = id;
 
-    ++unique_player_id;
-    return id;
-}
-
-void SnakeGame::add_player(SnakeGame::Player::ID id) {
-    players.insert({id, {}});
-    auto &player = players.at(id);
-    player.use_ai = true;
-    player.spawn_dir = Direction::Up;
-    player.color = get_random_color();
-    player.id = id;
-}
-
-void SnakeGame::recompute_spawn_points() {
+void SnakeGame::SinglePlayer::recompute_spawn_points() {
     auto n = players.size();
     u32 i = 0;
     for (auto &p : players) {
-        p.second.spawnY = gridRows - 10;
-        p.second.spawnX = gridCols * (i + 1) / (n + 1);
+        p.second.spawnY = game.gridRows - 10;
+        p.second.spawnX = game.gridCols * (i + 1) / (n + 1);
         add_message("spawn pos: %d %d", p.second.spawnX, p.second.spawnY);
         ++i;
     }
 }
 
-void SnakeGame::spawn(Player &player) {
-    //    paused = true;
-    player.body.resize(initialSize);
+void SnakeGame::SinglePlayer::spawn(Player &player) {
+
+    player.body.resize(player.initialSize);
     player.body[0] = {static_cast<int>(player.spawnX),
                       static_cast<int>(player.spawnY)};
 
@@ -70,7 +49,7 @@ void SnakeGame::spawn(Player &player) {
 }
 
 // leave food behind where the body was
-void SnakeGame::decompose(Player &player) {
+void SnakeGame::SinglePlayer::decompose(Player &player) {
     for (size_t i = 1; i < player.body.size(); ++i) {
         add_food(player.body[i].x, player.body[i].y);
     }
@@ -78,7 +57,7 @@ void SnakeGame::decompose(Player &player) {
     player.input_buffer.clear();
 }
 
-void SnakeGame::add_food(int x, int y) {
+void SnakeGame::SinglePlayer::add_food(int x, int y) {
     if (world_map(x, y).food == nullptr) {
         auto f = new Food{x, y};
         world_map(x, y).food = f;
@@ -86,7 +65,7 @@ void SnakeGame::add_food(int x, int y) {
     }
 }
 
-void SnakeGame::remove_food(int x, int y) {
+void SnakeGame::SinglePlayer::remove_food(int x, int y) {
     auto f = world_map(x, y).food;
     if (f != nullptr) {
         std::remove_if(food.begin(), food.end(),
@@ -96,7 +75,7 @@ void SnakeGame::remove_food(int x, int y) {
     world_map(x, y).food = nullptr;
 }
 
-void SnakeGame::reset_map() {
+void SnakeGame::SinglePlayer::reset_map() {
     for (auto f : food) {
         remove_food(f->p.x, f->p.y);
     }
@@ -141,18 +120,14 @@ void SnakeGame::init() {
 
     pause_text.setPosition(window->getSize().x / 2, window->getSize().y / 2);
 
-    world_map.resize(gridCols, gridRows);
-    food.clear();
-    add_food(rand() % gridCols, rand() % gridRows);
+   
 
     body_shape.setSize(sf::Vector2f(gridSize, gridSize));
     body_shape.setFillColor({255, 0, 0, 255});
-
+	
     food_shape.setSize(sf::Vector2f(gridSize / 2, gridSize / 2));
     food_shape.setFillColor({0, 255, 0, 255});
-    food_shape.setOrigin(-gridSize / 4, -gridSize / 4);
-
-    game_status = GameStatus::MainMenu;
+    food_shape.setOrigin(-(int)gridSize / 4, -(int)gridSize / 4);
 }
 
 // void SnakeGame::input_key_(sf::Keyboard::Key k, bool down) {
@@ -173,289 +148,377 @@ void SnakeGame::init() {
 
 void SnakeGame::update(Input &input, float dt) {
 
-    //    if (auto s = std::get_if<MainMenu>(&state)) {
-    //        s->update(input, dt);
-    //    }
-
-    switch (game_status) {
-    case GameStatus::MainMenu: {
-        main_menu(input, dt);
-    } break;
-    case GameStatus::SinglePlayer: {
-        single_player(input, dt);
-    } break;
-    case GameStatus::HostLobby: {
-        host_lobby(input, dt);
-    } break;
-    case GameStatus::GuestLobby: {
-        guest_lobby(input, dt);
-    } break;
-    case GameStatus::HostMultiPlayer: {
-        game_status = GameStatus::MainMenu;
-    } break;
-    case GameStatus::GuestMultiPlayer: {
-        game_status = GameStatus::MainMenu;
-    } break;
+    if (auto s = std::get_if<MainMenu>(&state)) {
+		main_menu(*s, input, dt);
     }
+	else if (auto s = std::get_if<SinglePlayer>(&state)) {
+		single_player(*s, input, dt);
+	}
+	else if (auto s = std::get_if<HostLobby>(&state)) {
+		host_lobby(*s, input, dt);
+	}
+	else if (auto s = std::get_if<GuestLobby>(&state)) {
+		guest_lobby(*s, input, dt);
+	}
 }
 
-sf::Color SnakeGame::get_random_color() {
-    sf::Color c;
-    c.r = rand() % 255;
-    c.g = rand() % 255;
-    c.b = 255 * 3 - c.r - c.b;
-    c.a = 255;
-    return c;
+sf::Color SnakeGame::get_random_color()
+{
+	sf::Color color;
+	color.r = rand() % 255;
+	color.g = rand() % 255;
+	color.b = 255*2 - color.r - color.g;
+	return color;
 }
 
-void SnakeGame::main_menu(Input &input, float dt) {
-    auto [w, h] = window->getView().getSize();
-    const int N = 4;
-    if (ui::push_button(w / 2, 1 * h / (N + 1), "MainMenu##Single Player",
-                        ui::Align::Center)) {
-        players.clear();
-        game_status = GameStatus::SinglePlayer;
-        add_player(local_id);
-        /*for (int i = 0; i < 20; i++)
-            add_player();*/
-        auto &player = players.at(local_id);
-        player.use_ai = false;
 
-        recompute_spawn_points();
-        for (auto &[id, player] : players)
-            spawn(player);
-    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "MainMenu##Host",
-                               ui::Align::Center)) {
-        network.start_server();
-        game_status = GameStatus::HostLobby;
-    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "MainMenu##Connect",
-                               ui::Align::Center)) {
-        network.connect();
-        game_status = GameStatus::GuestLobby;
-    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "MainMenu##Quit",
-                               ui::Align::Center)) {
-        window->close();
-    }
-}
 
-void SnakeGame::host_lobby(Input &input, float dt) {
+//void SnakeGame::main_menu(Input &input, float dt) {
+//    auto [w, h] = window->getView().getSize();
+//    const int N = 4;
+//    if (ui::push_button(w / 2, 1 * h / (N + 1), "MainMenu##Single Player",
+//                        ui::Align::Center)) {
+//        players.clear();
+//        game_status = GameStatus::SinglePlayer;
+//        add_player(local_id);
+//        /*for (int i = 0; i < 20; i++)
+//            add_player();*/
+//        auto &player = players.at(local_id);
+//        player.use_ai = false;
+//
+//        recompute_spawn_points();
+//        for (auto &[id, player] : players)
+//            spawn(player);
+//    } else if (ui::push_button(w / 2, 2 * h / (N + 1), "MainMenu##Host",
+//                               ui::Align::Center)) {
+//        network.start_server();
+//        game_status = GameStatus::HostLobby;
+//    } else if (ui::push_button(w / 2, 3 * h / (N + 1), "MainMenu##Connect",
+//                               ui::Align::Center)) {
+//        network.connect();
+//        game_status = GameStatus::GuestLobby;
+//    } else if (ui::push_button(w / 2, 4 * h / (N + 1), "MainMenu##Quit",
+//                               ui::Align::Center)) {
+//        window->close();
+//    }
+//}
+//
+void SnakeGame::host_lobby(HostLobby& s, Input &input, float dt) {
     ui::label(0, 0, "Hosting Game");
     if (ui::push_button(250, 0, "HostLobby##Start")) {
-        game_status = GameStatus::HostMultiPlayer;
+        
     } else if (ui::push_button(400, 0, "HostLobby##Quit")) {
-        network.stop_server();
-        game_status = GameStatus::MainMenu;
+		state.emplace<MainMenu>();
     }
+
+	Network::ClientID id;
+	while (s.network.recv(buffer, id)) {
+		Message msg;
+		buffer.read(msg);
+		switch (msg.header) {
+		case Message::Type::RequestJoin: {
+			add_message("Received RequestJoin");
+			buffer.reset();
+			msg.header = Message::Type::SetNewPlayer;
+			auto player = s.add_player(id);
+			msg.body.set_new_player.new_id = id;
+			buffer.write(msg);
+			s.network.send(buffer, id);
+		}break;
+		}
+
+	}
+
 }
 
-void SnakeGame::guest_lobby(Input &input, float dt) {
+void SnakeGame::guest_lobby(GuestLobby& s, Input &input, float dt) {
     ui::label(0, 0, "Lobby");
     if (ui::push_button(200, 0, "GuestLobby##Quit")) {
-        game_status = GameStatus::MainMenu;
+		state.emplace<MainMenu>();
     }
+
+	if (s.network.connected()) {
+		
+		if (auto none = std::get_if<GuestLobby::None>(&s.state)) {
+			buffer.bytes.clear();
+			Message msg;
+			msg.header = Message::Type::RequestJoin;
+			buffer.write(msg);
+			s.network.send(buffer);
+			s.state.emplace<GuestLobby::WaitingForId>();
+			add_message("Sent RequestJoin");
+		}
+		else if (auto waiting = std::get_if<GuestLobby::WaitingForId>(&s.state)) {
+			Network::ClientID id;
+			while (s.network.recv(buffer, id)) {
+				Message msg;
+				buffer.read(msg);
+				switch (msg.header) {
+				case Message::Type::SetNewPlayer: {
+					add_message("Received player id: %d", msg.body.set_new_player.new_id);
+					s.state.emplace<GuestLobby::Ready>(msg.body.set_new_player.new_id);
+				}break;
+				}
+			}
+		}
+		else if (auto ready = std::get_if<GuestLobby::Ready>(&s.state)) {
+
+		}
+	}
 }
 
-void SnakeGame::single_player(Input &input, float dt) {
-    network.update();
-
-    for (auto ev : input.events) {
-        auto &player = players.at(local_id);
-        if (auto e = std::get_if<Input::KeyPressed>(&ev)) {
-            if (e->key == sf::Keyboard::Space) {
-                player.boost = true;
-            } else if (e->key == sf::Keyboard::P) {
-                paused = !paused;
-            } else {
-                player.input_buffer.push_back(e->key);
-                paused = false;
-            }
-        } else if (auto e = std::get_if<Input::KeyReleased>(&ev)) {
-            if (e->key == sf::Keyboard::Space) {
-                player.boost = false;
-            } else {
-            }
-        } else if (auto e = std::get_if<Input::LostFocus>(&ev)) {
-            paused = true;
-        }
-    }
-
-    for (auto &[id, player] : players) {
-        int div = player.boost ? 0 : 1;
-        if (!paused && player.moveCounter++ >= player.moveDelay * div) {
-            if (!player.input_buffer.empty()) {
-                auto k = player.input_buffer.front();
-                player.input_buffer.pop_front();
-                if (k == sf::Keyboard::Left) {
-                    player.dir = set_dir(player, Direction::Left);
-                }
-
-                else if (k == sf::Keyboard::Right) {
-                    player.dir = set_dir(player, Direction::Right);
-                }
-
-                else if (k == sf::Keyboard::Down) {
-                    player.dir = set_dir(player, Direction::Down);
-                }
-
-                else if (k == sf::Keyboard::Up) {
-                    player.dir = set_dir(player, Direction::Up);
-                }
-            }
-
-            for (int i = player.body.size() - 1; i > 0; --i) {
-                player.body[i].x = player.body[i - 1].x;
-                player.body[i].y = player.body[i - 1].y;
-            }
-
-            if (player.use_ai) {
-                //                player.dir =
-                //                next_left[static_cast<int>(player.dir)];
-                Direction test_dir = player.dir;
-                int n = 0;
-                bool found = false;
-                do {
-                    int ty = player.body[0].y;
-                    int tx = player.body[0].x;
-
-                    switch (test_dir) {
-                    case Direction::Down:
-                        ty++;
-                        break;
-                    case Direction::Up:
-                        ty--;
-                        break;
-                    case Direction::Left:
-                        tx--;
-                        break;
-                    case Direction::Right:
-                        tx++;
-                        break;
-                    }
-
-                    bool collision = false;
-                    for (auto &[id_test, player_test] : players) {
-                        if (on_player(player, player_test, tx, ty)) {
-                            collision = true;
-                            break;
-                        }
-                    }
-
-                    if (tx < 0 || tx >= gridCols || ty < 0 || ty >= gridRows ||
-                        collision) {
-                        test_dir = next_right[static_cast<int>(test_dir)];
-                    } else {
-                        found = true;
-                    }
-                } while (!found && ++n < 4);
-                player.dir = test_dir;
-            }
-
-            switch (player.dir) {
-            case Direction::Down:
-                player.body[0].y++;
-                break;
-            case Direction::Up:
-                player.body[0].y--;
-                break;
-            case Direction::Left:
-                player.body[0].x--;
-                break;
-            case Direction::Right:
-                player.body[0].x++;
-                break;
-            }
-            player.moveCounter = 0;
-
-            foodRegrowCount++;
-        }
-    }
-
-    for (auto &[id, player] : players) {
-        if (player.body[0].x < 0 || player.body[0].x >= gridCols ||
-            player.body[0].y < 0 || player.body[0].y >= gridRows) {
-            add_message("You died! Do no try to go out of the playing field.\n"
-                        "Final score: %d",
-                        player.body.size() - 3);
-            player.dead = true;
-        }
-
-        for (auto f : food) {
-            food_shape.setPosition(f->p.x * gridSize, f->p.y * gridSize);
-            window->draw(food_shape);
-        }
-
-        int n = 0;
-        for (auto [x, y] : player.body) {
-
-            body_shape.setPosition(x * gridSize, y * gridSize);
-            auto color = player.color;
-            color.a = 255 - n * 64 / player.body.size();
-            body_shape.setFillColor(color);
-            window->draw(body_shape);
-            n++;
-        }
-
-        for (auto it = food.begin(); it != food.end();) {
-            auto f = *it;
-            if (player.body[0] == f->p) {
-                for (int i = 0; i < foodGrowth; ++i) {
-                    if (player.body.size() < 50) {
-                        player.body.push_back(player.body.back());
-                    }
-                }
-                world_map((*it)->p.x, (*it)->p.y).food = nullptr;
-                it = food.erase(it);
-                delete f;
-            } else {
-                ++it;
-            }
-        }
-
-        if (foodRegrowCount >= foodRegrow && food.size() < 10) {
-            add_food(rand() % gridCols, rand() % gridRows);
-            foodRegrowCount = 0;
-        }
-
-        bool collision = false;
-        for (auto &[id_test, player_test] : players) {
-            if (on_player(player, player_test)) {
-                collision = true;
-                break;
-            }
-        }
-        if (collision) {
-            add_message("You died! Do no eat snakes.\n"
-                        "Final score: %d",
-                        player.body.size() - 3);
-            player.dead = true;
-        }
-    }
-
-    for (auto &[id, player] : players) {
-        if (player.dead) {
-            decompose(player);
-            spawn(player);
-        }
-    }
-
-    if (paused) {
-        window->draw(pause_text);
-    }
-
-    //    if (ui::push_button(0, 0, "Server")) {
-    //        network.start_server();
-    //    }
-    //    if (ui::push_button(0, 25, "Client")) {
-    //        network.connect();
-    //    }
-
-    //    auto &player = players.at(local_id);
-    //    ui::label(200, 5, "Score: %4d", player.body.size() - initialSize);
-
-    //    if(players.size() > 0)
-    //    player.use_ai = ui::toggle_button(0, 50, "Snake AI");
+//
+void SnakeGame::main_menu(MainMenu& s, Input &input, float dt) {
+	auto[w, h] = window->getView().getSize();
+	const int N = 4;
+	if (ui::push_button(w / 2, 1 * h / (N + 1), "MainMenu##Single Player",
+		ui::Align::Center)) {
+		state.emplace<SinglePlayer>(*this);
+	}
+	else if (ui::push_button(w / 2, 2 * h / (N + 1), "MainMenu##Host",
+		ui::Align::Center)) {
+		state.emplace<HostLobby>(*this);
+	}
+	else if (ui::push_button(w / 2, 3 * h / (N + 1), "MainMenu##Connect",
+		ui::Align::Center)) {
+		state.emplace<GuestLobby>(*this);
+	}
+	else if (ui::push_button(w / 2, 4 * h / (N + 1), "MainMenu##Quit",
+		ui::Align::Center)) {
+		window->close();
+	}
 }
 
-void SnakeGame::MainMenu::update(Input &input, float dt) {}
+SnakeGame::SinglePlayer::SinglePlayer(SnakeGame& game): game(game)
+{
+	world_map.resize(game.gridCols, game.gridRows);
+	add_player();
+	recompute_spawn_points();
+	for (auto &[id, player] : players)
+	    spawn(player);
+}
 
-void SnakeGame::SinglePlayer::update(Input &input, float dt) {}
+void SnakeGame::single_player(SinglePlayer& s, Input &input, float dt) {
+
+	for (auto& ev : input.events) {
+		auto &player = s.players.at(s.local_id);
+		if (auto e = std::get_if<Input::KeyPressed>(&ev)) {
+			if (e->key == sf::Keyboard::Space) {
+				player.boost = true;
+			}
+			else if (e->key == sf::Keyboard::P) {
+				s.paused = !s.paused;
+			}
+			else {
+				player.input_buffer.push_back(e->key);
+				s.paused = false;
+			}
+		}
+		else if (auto e = std::get_if<Input::KeyReleased>(&ev)) {
+			if (e->key == sf::Keyboard::Space) {
+				player.boost = false;
+			}
+			else {
+			}
+		}
+		else if (auto e = std::get_if<Input::LostFocus>(&ev)) {
+			s.paused = true;
+		}
+	}
+
+	for (auto &[id, player] : s.players) {
+		int div = player.boost ? 0 : 1;
+		if (!s.paused && player.moveCounter++ >= player.moveDelay * div) {
+			if (!player.input_buffer.empty()) {
+				auto k = player.input_buffer.front();
+				player.input_buffer.pop_front();
+				if (k == sf::Keyboard::Left) {
+					player.dir = set_dir(player, Direction::Left);
+				}
+
+				else if (k == sf::Keyboard::Right) {
+					player.dir = set_dir(player, Direction::Right);
+				}
+
+				else if (k == sf::Keyboard::Down) {
+					player.dir = set_dir(player, Direction::Down);
+				}
+
+				else if (k == sf::Keyboard::Up) {
+					player.dir = set_dir(player, Direction::Up);
+				}
+			}
+
+			for (int i = player.body.size() - 1; i > 0; --i) {
+				player.body[i].x = player.body[i - 1].x;
+				player.body[i].y = player.body[i - 1].y;
+			}
+
+			if (player.use_ai) {
+				//                player.dir =
+				//                next_left[static_cast<int>(player.dir)];
+				Direction test_dir = player.dir;
+				int n = 0;
+				bool found = false;
+				do {
+					int ty = player.body[0].y;
+					int tx = player.body[0].x;
+
+					switch (test_dir) {
+					case Direction::Down:
+						ty++;
+						break;
+					case Direction::Up:
+						ty--;
+						break;
+					case Direction::Left:
+						tx--;
+						break;
+					case Direction::Right:
+						tx++;
+						break;
+					}
+
+					bool collision = false;
+					for (auto &[id_test, player_test] : s.players) {
+						if (on_player(player, player_test, tx, ty)) {
+							collision = true;
+							break;
+						}
+					}
+
+					if (tx < 0 || tx >= gridCols || ty < 0 || ty >= gridRows ||
+						collision) {
+						test_dir = next_right[static_cast<int>(test_dir)];
+					}
+					else {
+						found = true;
+					}
+				} while (!found && ++n < 4);
+				player.dir = test_dir;
+			}
+
+			switch (player.dir) {
+			case Direction::Down:
+				player.body[0].y++;
+				break;
+			case Direction::Up:
+				player.body[0].y--;
+				break;
+			case Direction::Left:
+				player.body[0].x--;
+				break;
+			case Direction::Right:
+				player.body[0].x++;
+				break;
+			}
+			player.moveCounter = 0;
+
+			s.foodRegrowCount++;
+		}
+	}
+
+	for (auto &[id, player] : s.players) {
+		if (player.body[0].x < 0 || player.body[0].x >= gridCols ||
+			player.body[0].y < 0 || player.body[0].y >= gridRows) {
+			add_message("You died! Do no try to go out of the playing field.\n"
+				"Final score: %d",
+				player.body.size() - 3);
+			player.dead = true;
+		}
+
+		for (auto f : s.food) {
+			food_shape.setPosition(f->p.x * gridSize, f->p.y * gridSize);
+			window->draw(food_shape);
+		}
+
+		int n = 0;
+		for (auto[x, y] : player.body) {
+
+			body_shape.setPosition(x * gridSize, y * gridSize);
+			auto color = player.color;
+			color.a = 255 - n * 64 / player.body.size();
+			body_shape.setFillColor(color);
+			window->draw(body_shape);
+			n++;
+		}
+
+		for (auto it = s.food.begin(); it != s.food.end();) {
+			auto f = *it;
+			if (player.body[0] == f->p) {
+				for (int i = 0; i < s.foodGrowth; ++i) {
+					if (player.body.size() < 50) {
+						player.body.push_back(player.body.back());
+					}
+				}
+				s.world_map((*it)->p.x, (*it)->p.y).food = nullptr;
+				it = s.food.erase(it);
+				delete f;
+			}
+			else {
+				++it;
+			}
+		}
+
+		if (s.foodRegrowCount >= s.foodRegrow && s.food.size() < 10) {
+			s.add_food(rand() % gridCols, rand() % gridRows);
+			s.foodRegrowCount = 0;
+		}
+
+		bool collision = false;
+		for (auto &[id_test, player_test] : s.players) {
+			if (on_player(player, player_test)) {
+				collision = true;
+				break;
+			}
+		}
+		if (collision) {
+			add_message("You died! Do no eat snakes.\n"
+				"Final score: %d",
+				player.body.size() - 3);
+			player.dead = true;
+		}
+	}
+
+	for (auto &[id, player] : s.players) {
+		if (player.dead) {
+			s.decompose(player);
+			s.spawn(player);
+		}
+	}
+
+	if (s.paused) {
+		window->draw(pause_text);
+	}
+}
+
+SnakeGame::Player * SnakeGame::SinglePlayer::add_player()
+{
+	Player::ID id = unique_player_id++;
+	auto& player = players.emplace(id, Player{}).first->second;
+	player.spawn_dir = Direction::Up;
+	player.color = game.get_random_color();
+	player.id = id;
+
+	return &player;
+}
+
+SnakeGame::Player * SnakeGame::HostLobby::add_player(Network::ClientID id)
+{
+	auto& player = players.emplace(id, Player{}).first->second;
+	player.spawn_dir = Direction::Up;
+	player.color = game.get_random_color();
+	player.id = id;
+
+	return &player;
+}
+
+SnakeGame::HostLobby::HostLobby(SnakeGame & game): game(game)
+{
+	network.start_server();
+}
+
+SnakeGame::GuestLobby::GuestLobby(SnakeGame & game): game(game)
+{
+	network.connect();
+}

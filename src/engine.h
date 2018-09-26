@@ -23,6 +23,8 @@ struct Input {
     void clear() { events.clear(); }
 };
 
+
+
 template <typename T> class LinearInterpolator {
 private:
     float from = 0;
