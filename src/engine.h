@@ -23,8 +23,6 @@ struct Input {
     void clear() { events.clear(); }
 };
 
-
-
 template <typename T> class LinearInterpolator {
 private:
     float from = 0;
@@ -124,9 +122,10 @@ struct ToggleButton {
 };
 
 void label(int x, int y, std::string fmt, ...);
+void labelc(int x, int y, const sf::Color &color, std::string fmt, ...);
 bool push_button(int x, int y, const std::string &label,
                  ui::Align h_align = ui::Align::Left);
-bool toggle_button(int x, int y, const std::string &label);
+bool toggle_button(int x, int y, const std::string &label, bool *var = nullptr);
 void display(sf::RenderWindow *window);
 
 } // namespace ui

@@ -129,7 +129,7 @@ bool push_button(int x, int y, const std::string &label, Align h_align) {
     return pressed;
 }
 
-bool toggle_button(int x, int y, const std::string &label) {
+bool toggle_button(int x, int y, const std::string &label, bool *var) {
 
     ToggleButton *button = nullptr;
     if (auto it = toggle_button_map.find(label);
@@ -148,6 +148,7 @@ bool toggle_button(int x, int y, const std::string &label) {
 
     assert(button);
     button->label.setPosition(x, y);
+    bool pressed = false;
 
     const auto BB = button->label.getGlobalBounds();
 
@@ -163,6 +164,7 @@ bool toggle_button(int x, int y, const std::string &label) {
 
     if (button->hover && leftPressed) {
         button->active = !button->active;
+        pressed = true;
     }
 
     if (button->active) {
@@ -173,7 +175,12 @@ bool toggle_button(int x, int y, const std::string &label) {
 
     window->draw(button->label);
 
-    return button->active;
+    if (var) {
+        *var = button->active;
+        return pressed;
+    } else {
+        return button->active;
+    }
 }
 
 void label(int x, int y, std::string fmt, ...) {
@@ -185,6 +192,21 @@ void label(int x, int y, std::string fmt, ...) {
     va_end(args);
 
     label_text.setFillColor({255, 255, 255, 255});
+    label_text.setCharacterSize(30);
+    label_text.setString(buffer);
+    label_text.setPosition(x, y);
+    window->draw(label_text);
+}
+
+void labelc(int x, int y, const sf::Color &color, std::string fmt, ...) {
+    static char buffer[255];
+    va_list args;
+    va_start(args, fmt);
+
+    vsnprintf(buffer, sizeof(buffer), fmt.c_str(), args);
+    va_end(args);
+
+    label_text.setFillColor(color);
     label_text.setCharacterSize(30);
     label_text.setString(buffer);
     label_text.setPosition(x, y);

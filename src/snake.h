@@ -7,14 +7,29 @@ namespace SnakeNetwork {
 
 struct HeartBeat {};
 
-struct RequestJoin {};
+struct JoinRequest {};
 
-struct SetNewPlayer {
-    SetNewPlayer(Network::ClientID id) : id(id) {}
+struct JoinResponse {
+    JoinResponse(Network::ClientID id) : id(id) {}
     const Network::ClientID id;
 };
 
-using Message = std::variant<HeartBeat, RequestJoin, SetNewPlayer>;
+struct SetReady {
+    bool ready;
+};
+
+struct ServerSetReady {
+    bool ready;
+    Network::ClientID id;
+};
+
+struct NewPlayer {
+    Network::ClientID id;
+    bool ready;
+};
+
+using Message = std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady,
+                             ServerSetReady, NewPlayer>;
 }; // namespace SnakeNetwork
 
 struct SnakeGame {
@@ -59,8 +74,16 @@ struct SnakeGame {
         Direction spawn_dir;
 
         Network::ClientID id;
+        std::vector<Network::ClientID> known_ids;
+
+        bool ready = false;
 
         u32 initialSize = 3;
+
+        Network::Buffer send_buffer;
+
+        // Player(const Player &) = delete;
+        void operator=(const Player &) = delete;
     };
 
     struct MainMenu {};
@@ -124,7 +147,8 @@ struct SnakeGame {
     u32 gridRows = 30;
     u32 gridCols = 30;
 
-    Network::Buffer buffer;
+    Network::Buffer recv_buffer;
+
     Direction set_dir(Player &player, Direction d);
 
     bool on_player(const Player &p1, const Player &p2);

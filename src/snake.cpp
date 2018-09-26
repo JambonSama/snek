@@ -195,7 +195,7 @@ sf::Color SnakeGame::get_random_color() {
 //}
 //
 void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
-    ui::label(0, 0, "Hosting Game");
+    ui::label(5, 0, "Hosting Game");
     if (ui::push_button(250, 0, "HostLobby##Start")) {
 
     } else if (ui::push_button(400, 0, "HostLobby##Quit")) {
@@ -204,26 +204,52 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
 
     while (auto id = s.network.get_new_client()) {
         printf("Got new player: %d\n", *id);
-        auto player = s.add_player(*id);
+        s.add_player(*id);
+    }
+
+    for (auto &[id, player] : s.players) {
+        player.send_buffer.reset();
     }
 
     for (auto it = s.players.begin(); it != s.players.end();) {
         const auto id = it->first;
-        auto player = it->second;
+        auto &player = it->second;
         using namespace SnakeNetwork;
         if (id != s.local_id) {
-            if (s.network.recv(buffer, id)) {
-                Message msg;
-                buffer.read(msg);
-                if (std::get_if<HeartBeat>(&msg)) {
-                    msg.emplace<HeartBeat>();
-                } else if (std::get_if<RequestJoin>(&msg)) {
-                    msg.emplace<SetNewPlayer>(id);
-                }
 
-                buffer.reset();
-                buffer.write(msg);
-                s.network.send(buffer, id);
+            if (s.network.recv(recv_buffer, id)) {
+                Message msg;
+                while (!recv_buffer.empty()) {
+                    recv_buffer.read(msg);
+                    if (std::get_if<HeartBeat>(&msg)) {
+                        msg.emplace<HeartBeat>();
+                        player.send_buffer.write(msg);
+                    } else if (std::get_if<JoinRequest>(&msg)) {
+                        msg.emplace<JoinResponse>(id);
+                        player.send_buffer.write(msg);
+
+                    } else if (auto m = std::get_if<SetReady>(&msg)) {
+                        player.ready = m->ready;
+                        bool ready = m->ready;
+                        msg = ServerSetReady{ready, id};
+                        for (auto &[tid, tplayer] : s.players) {
+                            tplayer.send_buffer.write(msg);
+                        }
+                    }
+                }
+                if (player.known_ids.size() != s.players.size()) {
+                    for (auto &[tid, tplayer] : s.players) {
+                        if (std::find(player.known_ids.begin(),
+                                      player.known_ids.end(),
+                                      tid) == player.known_ids.end()) {
+                            msg = NewPlayer{tid, tplayer.ready};
+                            player.known_ids.push_back(tid);
+                            player.send_buffer.write(msg);
+                            printf("Sharing player id %u with %u\n", tid, id);
+                        }
+                    }
+                }
+                s.network.send(player.send_buffer, id);
                 ++it;
             } else {
                 it = s.players.erase(it);
@@ -236,43 +262,71 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
     int y = 50;
 
     for (auto &[id, player] : s.players) {
-        ui::label(20, y, "Player %u", id);
+        ui::labelc(20, y,
+                   player.ready ? sf::Color{100, 255, 100, 255}
+                                : sf::Color{255, 100, 100, 255},
+                   "Player %u : %s", id, player.ready ? "Ready" : "Not Ready");
         y += 40;
     }
 }
 
 void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
-    ui::label(0, 0, "Lobby");
-    if (ui::push_button(200, 0, "GuestLobby##Quit")) {
+    using namespace SnakeNetwork;
+    Message msg;
+    Network::Buffer send_buffer;
+
+    ui::label(5, 0, "Lobby");
+
+    if (bool ready; ui::toggle_button(250, 0, "Ready", &ready)) {
+        msg = SetReady{ready};
+        send_buffer.write(msg);
+        printf("Sending %s\n", ready ? "Ready" : "Not Ready");
+    }
+    if (ui::push_button(400, 0, "GuestLobby##Quit")) {
         state.emplace<MainMenu>();
     }
 
     if (s.network.connected()) {
-        using namespace SnakeNetwork;
-        Message msg;
 
         if (s.local_id == 0) {
-            msg.emplace<RequestJoin>();
-            printf("Sending request join\n");
+            msg.emplace<JoinRequest>();
+            send_buffer.write(msg);
+            printf("Sending JoinRequest\n");
         } else {
             msg.emplace<HeartBeat>();
-            //            printf("Sending heart beat\n");
+            send_buffer.write(msg);
         }
 
-        buffer.reset();
-        buffer.write(msg);
-        s.network.send(buffer);
+        s.network.send(send_buffer);
 
-        if (s.network.recv(buffer)) {
-            buffer.read(msg);
-            if (auto m = std::get_if<SetNewPlayer>(&msg)) {
-                printf("Received SetNewPlayer\n");
-                s.add_player(m->id);
-                s.local_id = m->id;
+        if (s.network.recv(recv_buffer)) {
+            while (!recv_buffer.empty()) {
+                recv_buffer.read(msg);
+                if (auto m = std::get_if<JoinResponse>(&msg)) {
+                    printf("Received JoinResponse\n");
+                    s.add_player(m->id);
+                    s.local_id = m->id;
+                } else if (auto m = std::get_if<NewPlayer>(&msg)) {
+                    printf("Received NewPlayer\n");
+                    auto p = s.add_player(m->id);
+                    p->ready = m->ready;
+                } else if (auto m = std::get_if<ServerSetReady>(&msg)) {
+                    printf("Received ServerSetReady\n");
+                    auto &p = s.players.at(m->id);
+                    p.ready = m->ready;
+                }
             }
         } else {
             state.emplace<MainMenu>();
         }
+    }
+    int y = 50;
+    for (auto &[id, player] : s.players) {
+        ui::labelc(20, y,
+                   player.ready ? sf::Color{100, 255, 100, 255}
+                                : sf::Color{255, 100, 100, 255},
+                   "Player %u : %s", id, player.ready ? "Ready" : "Not Ready");
+        y += 40;
     }
 }
 
@@ -510,7 +564,8 @@ SnakeGame::Player *SnakeGame::HostLobby::add_player(Network::ClientID id) {
 }
 
 SnakeGame::HostLobby::HostLobby(SnakeGame &game) : game(game) {
-    add_player(local_id);
+    auto player = add_player(local_id);
+    player->ready = true;
     network.start_server();
 }
 
