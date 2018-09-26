@@ -149,8 +149,27 @@ sf::Color SnakeGame::get_random_color() {
 }
 
 void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
+    for (auto &[id, player] : s.players) {
+        player.send_buffer.reset();
+    }
+
     ui::label(5, 0, "Hosting Game");
     if (ui::push_button(250, 0, "HostLobby##Start")) {
+        using namespace SnakeNetwork;
+        s.recompute_spawn_points();
+        for (auto &[id, player] : s.players) {
+            Message msg = SetPlayerInfo{id,
+                                        player.ready,
+                                        player.spawnX,
+                                        player.spawnY,
+                                        player.spawn_dir,
+                                        player.color};
+            for (auto &[tid, tplayer] : s.players) {
+                if (tid == s.local_id)
+                    continue;
+                tplayer.send_buffer.write(msg);
+            }
+        }
 
     } else if (ui::push_button(400, 0, "HostLobby##Quit")) {
         state.emplace<MainMenu>();
@@ -159,10 +178,6 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
     while (auto id = s.network.get_new_client()) {
         printf("Got new player: %d\n", *id);
         s.add_player(*id);
-    }
-
-    for (auto &[id, player] : s.players) {
-        player.send_buffer.reset();
     }
 
     for (auto it = s.players.begin(); it != s.players.end();) {
@@ -198,11 +213,7 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
                     } else if (auto m = std::get_if<SetReady>(&msg)) {
                         player.ready = m->ready;
                         msg = ServerSetReady{player.ready, id};
-                        printf("Sending to %u players\n", s.players.size());
                         for (auto &[tid, tplayer] : s.players) {
-                            printf(
-                                "Sending ServerSetReady (v=%d id=%u) to %u\n",
-                                player.ready, id, tid);
                             tplayer.send_buffer.write(msg);
                         }
                     }
@@ -285,6 +296,15 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
                     p.ready = m->ready;
                 } else if (auto m = std::get_if<PlayerLeft>(&msg)) {
                     s.players.erase(m->id);
+                } else if (auto m = std::get_if<SetPlayerInfo>(&msg)) {
+                    auto &p = s.players.at(m->id);
+                    p.spawnX = m->spawnX;
+                    p.spawnY = m->spawnY;
+                    p.spawn_dir = m->spawn_dir;
+                    p.color = m->color;
+                    p.ready = m->ready;
+                } else if (auto m = std::get_if<StartGame>(&msg)) {
+                    s.game_running = true;
                 }
             }
         } else {
@@ -323,6 +343,10 @@ void SnakeGame::main_menu(MainMenu &s, Input &input, float dt) {
 SnakeGame::SinglePlayer::SinglePlayer(SnakeGame &game) : game(game) {
     world_map.resize(game.gridCols, game.gridRows);
     add_player();
+    for (int i = 0; i < 5; i++) {
+        auto p = add_player();
+        p->use_ai = true;
+    }
     recompute_spawn_points();
     for (auto &[id, player] : players)
         spawn(player);
@@ -463,6 +487,13 @@ void SnakeGame::single_player(SinglePlayer &s, Input &input, float dt) {
             auto color = player.color;
             color.a = 255 - n * 64 / player.body.size();
             body_shape.setFillColor(color);
+            if (id == s.local_id) {
+                body_shape.setOutlineColor({255, 255, 255, 255});
+                body_shape.setOutlineThickness(1);
+            } else {
+                body_shape.setOutlineColor({0, 0, 0, 0});
+                body_shape.setOutlineThickness(0);
+            }
             window->draw(body_shape);
             n++;
         }
@@ -538,6 +569,17 @@ SnakeGame::HostLobby::HostLobby(SnakeGame &game) : game(game) {
     auto player = add_player(local_id);
     player->ready = true;
     network.start_server();
+}
+
+void SnakeGame::HostLobby::recompute_spawn_points() {
+    auto n = players.size();
+    u32 i = 0;
+    for (auto &[id, p] : players) {
+        p.spawnY = game.gridRows - 10;
+        p.spawnX = game.gridCols * (i + 1) / (n + 1);
+        // add_message("spawn pos: %d %d", p.spawnX, p.spawnY);
+        ++i;
+    }
 }
 
 SnakeGame::GuestLobby::GuestLobby(SnakeGame &game) : game(game) {

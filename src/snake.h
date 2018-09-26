@@ -3,39 +3,6 @@
 #include "network.h"
 #include "stable_win32.hpp"
 
-namespace SnakeNetwork {
-
-struct HeartBeat {};
-
-struct JoinRequest {};
-
-struct JoinResponse {
-    JoinResponse(Network::ClientID id) : id(id) {}
-    const Network::ClientID id;
-};
-
-struct SetReady {
-    bool ready;
-};
-
-struct ServerSetReady {
-    bool ready;
-    Network::ClientID id;
-};
-
-struct NewPlayer {
-    Network::ClientID id;
-    bool ready;
-};
-
-struct PlayerLeft {
-    Network::ClientID id;
-};
-
-using Message = std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady,
-                             ServerSetReady, NewPlayer, PlayerLeft>;
-}; // namespace SnakeNetwork
-
 struct SnakeGame {
     u32 gridSize = 16;
     sf::RectangleShape body_shape;
@@ -131,6 +98,10 @@ struct SnakeGame {
 
         const Network::ClientID local_id = 0;
         Network::ClientID unique_player_id = 1;
+
+        void recompute_spawn_points();
+
+        bool game_running = false;
     };
 
     struct GuestLobby {
@@ -142,6 +113,7 @@ struct SnakeGame {
         std::unordered_map<Network::ClientID, Player> players;
 
         Network::ClientID local_id = 0;
+        bool game_running = false;
     };
 
     using GameState =
@@ -169,3 +141,53 @@ struct SnakeGame {
     void guest_lobby(GuestLobby &s, Input &input, float dt);
     void single_player(SinglePlayer &s, Input &input, float);
 };
+
+namespace SnakeNetwork {
+
+struct HeartBeat {};
+
+struct JoinRequest {};
+
+struct JoinResponse {
+    JoinResponse(Network::ClientID id) : id(id) {}
+    const Network::ClientID id;
+};
+
+struct SetReady {
+    bool ready;
+};
+
+struct ServerSetReady {
+    bool ready;
+    Network::ClientID id;
+};
+
+struct NewPlayer {
+    Network::ClientID id;
+    bool ready;
+};
+
+struct PlayerLeft {
+    Network::ClientID id;
+};
+
+struct SetPlayerInfo {
+    Network::ClientID id;
+    bool ready;
+    u32 spawnX;
+    u32 spawnY;
+    SnakeGame::Direction spawn_dir;
+    sf::Color color;
+};
+
+struct StartGame {};
+
+struct PlayerInput {
+    sf::Keyboard::Key key;
+    bool down;
+};
+
+using Message =
+    std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady, ServerSetReady,
+                 NewPlayer, PlayerLeft, SetPlayerInfo, StartGame, PlayerInput>;
+}; // namespace SnakeNetwork
