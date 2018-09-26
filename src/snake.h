@@ -66,6 +66,13 @@ struct SnakeGame {
     using PlayerList = std::unordered_map<Network::ClientID, Player>;
     using WorldMap = Array2D<Cell>;
 
+    std::vector<Food *> food;
+    int foodRegrow = 20;
+    int foodRegrowCount = 0;
+
+    int foodGrowth = 1;
+    WorldMap world_map;
+
     struct SinglePlayer {
         SinglePlayer(SnakeGame &game);
         void add_food(int x, int y);
@@ -81,15 +88,12 @@ struct SnakeGame {
         Network::ClientID unique_player_id = 0;
 
         PlayerList players;
-        std::vector<Food *> food;
-        int foodRegrow = 20;
-        int foodRegrowCount = 0;
-
-        int foodGrowth = 1;
-        WorldMap world_map;
 
         bool paused = false;
         SnakeGame &game;
+
+        Direction set_dir(Player &player, Direction d);
+        void game_tick(Input &input, float dt);
     };
 
     struct HostLobby {
@@ -105,9 +109,12 @@ struct SnakeGame {
 
         void recompute_spawn_points();
         void spawn(Player &player);
+        void decompose(Player &player);
         void send_all(SnakeNetwork::Message &msg);
+        void add_food(int x, int y);
 
         void game_tick(Input &input, float dt);
+        Direction set_dir(Player &player, Direction d);
 
         bool game_running = false;
     };
@@ -122,9 +129,12 @@ struct SnakeGame {
 
         Network::ClientID local_id = 0;
         bool game_running = false;
+        Network::Buffer send_buffer;
 
         void spawn(Player &player);
         void game_tick(Input &input, float dt);
+        void decompose(Player &player);
+        void add_food(int x, int y);
     };
 
     using GameState =
@@ -135,8 +145,6 @@ struct SnakeGame {
     u32 gridCols = 30;
 
     Network::Buffer recv_buffer;
-
-    Direction set_dir(Player &player, Direction d);
 
     bool on_player(const Player &p1, const Player &p2);
     bool on_player(const Player &p1, const Player &p2, int x, int y);
@@ -197,6 +205,10 @@ struct SpawnPlayer {
     Network::ClientID id;
 };
 
+struct KillPlayer {
+    Network::ClientID id;
+};
+
 struct MovePlayer {
     Network::ClientID id;
     SnakeGame::Direction dir;
@@ -211,7 +223,7 @@ struct Message {
 
     std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady, ServerSetReady,
                  NewPlayer, PlayerLeft, SetPlayerInfo, StartGame, PlayerInput,
-                 SpawnPlayer, MovePlayer>
+                 SpawnPlayer, MovePlayer, KillPlayer>
         body;
 };
 
