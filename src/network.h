@@ -48,7 +48,7 @@ private:
 
 	size_t push_index_ = 0;
 	size_t pop_index_ = 0;
-	size_t size_ = 0;
+    std::atomic<size_t> size_ = 0;
 	std::array<T, N> data_;
 	std::mutex mutex;
 };
@@ -108,26 +108,15 @@ struct Network {
         net::ip::tcp::resolver resolver;
 
         Client(net::io_context &ctx);
-		CircularBuffer<Buffer, 100, true> rx;
-		CircularBuffer<Buffer, 100, true> tx;
 
 		std::atomic_bool connected = false;
-
-		void start_send();
-		void on_send();
     };
 
     struct ConnectedClient {
         net::ip::tcp::socket socket;
         net::ip::tcp::endpoint endpoint;
 
-		CircularBuffer<Buffer, 100, true> rx;
-		CircularBuffer<Buffer, 100, true> tx;
-        Buffer buffer;
-
         ConnectedClient(net::io_context &ctx, net::ip::tcp::socket socket_);
-        void start_read();
-        void on_read(size_t size);
     };
 
     struct Server {
@@ -143,6 +132,7 @@ struct Network {
 
 	std::mutex mutex;
 
+    CircularBuffer<ClientID, 20, true> new_clients;
 
     std::variant<None, Client, Server> state;
 
@@ -154,8 +144,10 @@ struct Network {
 
     void start_accept();
 
+    std::optional<ClientID> get_new_client();
+
 	void send(Buffer& b, ClientID id = 0);
-	bool recv(Buffer& b, ClientID& id);
+    bool recv(Buffer& b, ClientID id = 0);
 
 	bool connected();
 };

@@ -4,36 +4,9 @@
 
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}
 
-void Network::Client::start_send() {
-	
-}
-
-void Network::Client::on_send() {
-
-}
-
 Network::ConnectedClient::ConnectedClient(net::io_context &ctx,
                                           net::ip::tcp::socket socket_)
-    : socket(std::move(socket_)) {
-    start_read();
-}
-
-void Network::ConnectedClient::start_read() {
-    net::async_read(socket, net::dynamic_buffer(buffer.bytes),
-                    net::transfer_at_least(1), [this](auto ec, auto size) {
-                        on_read(size);
-                        start_read();
-                    });
-}
-
-void Network::ConnectedClient::on_read(size_t size) {
-    if (size != 0) {
-        add_message("Received %d bytes", size);
-		rx.push(buffer);
-    } else {
-        socket.close();
-    }
-}
+    : socket(std::move(socket_)) {}
 
 Network::Server::Server(net::io_context &ctx) : acceptor(ctx) {}
 
@@ -42,7 +15,6 @@ Network::~Network() {
     work.reset();
     work_thread.join();
 }
-
 
 void Network::update() {}
 
@@ -62,17 +34,10 @@ void Network::connect() {
         [&client](auto ec, auto endpoint) {
             if (!ec) {
                 add_message("connected to localhost");
-				client.connected = true;
-				
-                //std::string msg = "Hello Snake! Kacer kac kac FF";
-
-                ////            net::async_write(client.socket,
-                ////            net::buffer(msg),
-                ////                             [](auto ec, auto size) {});
-                //auto n = net::write(client.socket, net::buffer(msg));
-                // add_message("sent message, n = %d", n);
+                client.connected = true;
             } else {
                 add_message("Failed to connect: %s", ec.message().c_str());
+                client.connected = false;
             }
         });
 }
@@ -109,11 +74,12 @@ void Network::start_accept() {
     if (auto server = std::get_if<Server>(&state); server) {
         server->acceptor.async_accept(
             [this](std::error_code ec, net::ip::tcp::socket socket) {
-				std::lock_guard guard(mutex);
+                std::lock_guard guard(mutex);
                 if (auto server = std::get_if<Server>(&state)) {
                     if (!ec) {
-						const auto id = server->unique_client_id++;
-						server->clients.try_emplace(id, ctx, std::move(socket));
+                        const auto id = server->unique_client_id++;
+                        server->clients.try_emplace(id, ctx, std::move(socket));
+                        new_clients.push(id);
                         start_accept();
 
                         add_message("A client has connected to the server!");
@@ -124,62 +90,72 @@ void Network::start_accept() {
     }
 }
 
-void Network::send(Buffer& b, ClientID id) {
-	std::lock_guard guard(mutex);
-	if (auto server = std::get_if<Server>(&state)) {
-		auto it = server->clients.find(id);
-		if (it != server->clients.end()) {
-			net::async_write(it->second.socket, net::dynamic_buffer(b.bytes), [](auto ec, auto n) {
-				if (!ec) {
-					add_message("Sent %d bytes", n);
-				}
-				else {
-					add_message("Error while sending: %s", ec.message().c_str());
-				}
-			});
-		}
-	}
-	else if (auto client = std::get_if<Client>(&state)) {
-		net::async_write(client->socket, net::dynamic_buffer(b.bytes), [](auto ec, auto n) {
-			if (!ec) {
-				add_message("Sent %d bytes", n);
-			}
-			else {
-				add_message("Error while sending: %s", ec.message().c_str());
-			}
-		});
-	}
+std::optional<Network::ClientID> Network::get_new_client() {
+    if (new_clients.size() > 0)
+        return new_clients.pop();
+    return {};
 }
 
-bool Network::recv(Buffer & b, Network::ClientID& id)
-{
-	std::lock_guard guard(mutex);
-	b.bytes.clear();
-	if (auto server = std::get_if<Server>(&state)) {
-		for (auto &[k, client] : server->clients) {
-			if (client.rx.size() > 0) {
-				b = client.rx.pop();
-				id = k;
-				return true;
-			}
-		}
-	}
-	else if (auto client = std::get_if<Client>(&state)) {
-		if (client->rx.size() > 0) {
-			b = client->rx.pop();
-			id = 0;
-			return true;
-		}
-	}
-	return false;
+void Network::send(Buffer &b, ClientID id) {
+    std::lock_guard guard(mutex);
+    if (auto server = std::get_if<Server>(&state)) {
+        auto it = server->clients.find(id);
+        if (it != server->clients.end()) {
+            std::error_code ec;
+            auto size =
+                net::write(it->second.socket, net::dynamic_buffer(b.bytes), ec);
+            // printf("write %u bytes\n", size);
+        }
+    } else if (auto client = std::get_if<Client>(&state)) {
+        std::error_code ec;
+        auto size =
+            net::write(client->socket, net::dynamic_buffer(b.bytes), ec);
+        //        printf("write %u bytes\n", size);
+    }
+}
+
+bool Network::recv(Buffer &b, ClientID id) {
+    std::lock_guard guard(mutex);
+    b.reset();
+
+    if (auto server = std::get_if<Server>(&state)) {
+        if (auto it = server->clients.find(id); it != server->clients.end()) {
+            auto &client = it->second;
+            std::error_code ec;
+            auto size = net::read(client.socket, net::dynamic_buffer(b.bytes),
+                                  net::transfer_at_least(1), ec);
+            //            printf("read %u bytes\n", size);
+            if (!ec) {
+                return true;
+            } else {
+                add_message("Error when reading from client %d: %s", id,
+                            ec.message().c_str());
+                return false;
+            }
+        }
+
+    } else if (auto client = std::get_if<Client>(&state)) {
+        std::error_code ec;
+        auto size = net::read(client->socket, net::dynamic_buffer(b.bytes),
+                              net::transfer_at_least(1), ec);
+        //        printf("read %u bytes\n", size);
+        if (!ec) {
+            return true;
+        } else {
+            client->connected = false;
+            add_message("Error when reading from server: %s", id,
+                        ec.message().c_str());
+            return false;
+        }
+    }
+    return false;
 }
 
 bool Network::connected() {
-	if (auto server = std::get_if<Server>(&state)) {
-		return true;
-	}
-	else if (auto client = std::get_if<Client>(&state)) {
-		return client->connected;
-	}
-	return false;
+    if (auto server = std::get_if<Server>(&state)) {
+        return true;
+    } else if (auto client = std::get_if<Client>(&state)) {
+        return client->connected;
+    }
+    return false;
 }

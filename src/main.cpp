@@ -1,8 +1,7 @@
-#include "stable_win32.hpp"
 #include "engine.h"
 #include "network.h"
 #include "snake.h"
-
+#include "stable_win32.hpp"
 
 #ifdef _WIN32
 #ifdef _DEBUG
@@ -249,6 +248,8 @@ void draw_messages() {
 #include <utility>
 
 int main() {
+    // Set stdout to unbuffered (auto stdout flush)
+    setvbuf(stdout, NULL, _IONBF, 0);
     SnakeGame snake;
 
     window = new sf::RenderWindow({800, 600}, "Games");

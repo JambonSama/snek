@@ -19,7 +19,7 @@ SOURCES += \
 
 HEADERS += \
     ../src/snake.h \
-    ../scr/network.h \
+    ../src/network.h \
     ../src/stable_win32.hpp \
     ../src/engine.h
 
