@@ -2,8 +2,8 @@
 #include "engine.h"
 #include "stable_win32.hpp"
 
-static constexpr auto PORT = "5679";
-static constexpr auto PORTN = 5679;
+static constexpr auto PORT = "5678";
+static constexpr auto PORTN = 5678;
 
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}
 
@@ -33,7 +33,7 @@ void Network::connect() {
     auto &client = std::get<Client>(state);
 
     net::async_connect(
-        client.socket, client.resolver.resolve("localhost", PORT),
+        client.socket, client.resolver.resolve("192.168.0.248", PORT),
         [&client](auto ec, auto endpoint) {
             if (!ec) {
                 add_message("connected to localhost");

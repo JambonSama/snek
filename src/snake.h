@@ -126,6 +126,7 @@ struct SnakeGame {
 
         Player *add_player(Network::ClientID id);
         std::unordered_map<Network::ClientID, Player> players;
+		std::list<SnakeNetwork::Message> msgs;
 
         Network::ClientID local_id = 0;
         bool game_running = false;
@@ -135,6 +136,7 @@ struct SnakeGame {
         void game_tick(Input &input, float dt);
         void decompose(Player &player);
         void add_food(int x, int y);
+		void remove_food(int x, int y);
     };
 
     using GameState =
@@ -205,13 +207,23 @@ struct SpawnPlayer {
     Network::ClientID id;
 };
 
-struct KillPlayer {
-    Network::ClientID id;
-};
-
 struct MovePlayer {
     Network::ClientID id;
     SnakeGame::Direction dir;
+};
+
+struct SpawnFood {
+	int x;
+	int y;
+};
+
+struct DestroyFood {
+	int x;
+	int y;
+};
+
+struct PlayerGrow {
+	Network::ClientID id;
 };
 
 struct PlayerInput {
@@ -223,7 +235,7 @@ struct Message {
 
     std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady, ServerSetReady,
                  NewPlayer, PlayerLeft, SetPlayerInfo, StartGame, PlayerInput,
-                 SpawnPlayer, MovePlayer, KillPlayer>
+                 SpawnPlayer, MovePlayer, SpawnFood, DestroyFood, PlayerGrow>
         body;
 };
 
