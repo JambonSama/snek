@@ -3,6 +3,10 @@
 #include "network.h"
 #include "stable_win32.hpp"
 
+namespace SnakeNetwork {
+struct Message;
+}
+
 struct SnakeGame {
     u32 gridSize = 16;
     sf::RectangleShape body_shape;
@@ -100,6 +104,10 @@ struct SnakeGame {
         Network::ClientID unique_player_id = 1;
 
         void recompute_spawn_points();
+        void spawn(Player &player);
+        void send_all(SnakeNetwork::Message &msg);
+
+        void game_tick(Input &input, float dt);
 
         bool game_running = false;
     };
@@ -114,6 +122,9 @@ struct SnakeGame {
 
         Network::ClientID local_id = 0;
         bool game_running = false;
+
+        void spawn(Player &player);
+        void game_tick(Input &input, float dt);
     };
 
     using GameState =
@@ -182,12 +193,26 @@ struct SetPlayerInfo {
 
 struct StartGame {};
 
+struct SpawnPlayer {
+    Network::ClientID id;
+};
+
+struct MovePlayer {
+    Network::ClientID id;
+    SnakeGame::Direction dir;
+};
+
 struct PlayerInput {
     sf::Keyboard::Key key;
     bool down;
 };
 
-using Message =
+struct Message {
+
     std::variant<HeartBeat, JoinRequest, JoinResponse, SetReady, ServerSetReady,
-                 NewPlayer, PlayerLeft, SetPlayerInfo, StartGame, PlayerInput>;
+                 NewPlayer, PlayerLeft, SetPlayerInfo, StartGame, PlayerInput,
+                 SpawnPlayer, MovePlayer>
+        body;
+};
+
 }; // namespace SnakeNetwork
