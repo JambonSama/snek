@@ -274,7 +274,8 @@ int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     SnakeGame snake;
 
-    window = new sf::RenderWindow({800, 800}, "Games", sf::Style::Titlebar | sf::Style::Close);
+    window = new sf::RenderWindow({800, 800}, "Games",
+                                  sf::Style::Titlebar | sf::Style::Close);
     window->setFramerateLimit(60);
     // window->setVerticalSyncEnabled(true);
 
@@ -376,7 +377,7 @@ void add_message(std::string fmt, ...) {
     va_start(args, fmt);
     vsnprintf(buffer, sizeof(buffer), oss.str().c_str(), args);
     va_end(args);
-	printf("%s\n", buffer);
+    printf("%s\n", buffer);
     messages.emplace_front(buffer);
     if (messages.size() > max_message) {
         messages.pop_back();

@@ -134,8 +134,12 @@ struct Network {
 
     std::optional<ClientID> get_new_client();
 
-    void send(Buffer &b, ClientID id = 0);
-    bool recv(Buffer &b, ClientID id = 0);
+    void send(Buffer &b, ClientID id);
+    bool recv(Buffer &b, ClientID id);
 
     bool connected();
+    void print_stats();
+
+    u32 bytes_sent = 0;
+    u32 bytes_received = 0;
 };

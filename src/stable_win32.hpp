@@ -1,5 +1,5 @@
 #pragma once
 
-#ifdef _WIN32
+//#ifdef _WIN32
 #include "stable.hpp"
-#endif
+//#endif

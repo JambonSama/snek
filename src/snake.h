@@ -1,5 +1,6 @@
 #pragma once
 #include "engine.h"
+#include "net2.h"
 #include "network.h"
 #include "stable_win32.hpp"
 
@@ -112,6 +113,7 @@ struct SnakeGame {
         void decompose(Player &player);
         void send_all(SnakeNetwork::Message &msg);
         void add_food(int x, int y);
+        void grow_player(Player &player);
 
         void game_tick(Input &input, float dt);
         Direction set_dir(Player &player, Direction d);
@@ -126,7 +128,7 @@ struct SnakeGame {
 
         Player *add_player(Network::ClientID id);
         std::unordered_map<Network::ClientID, Player> players;
-		std::list<SnakeNetwork::Message> msgs;
+        std::list<SnakeNetwork::Message> msgs;
 
         Network::ClientID local_id = 0;
         bool game_running = false;
@@ -134,9 +136,9 @@ struct SnakeGame {
 
         void spawn(Player &player);
         void game_tick(Input &input, float dt);
-        void decompose(Player &player);
         void add_food(int x, int y);
-		void remove_food(int x, int y);
+        void remove_food(int x, int y);
+        void grow_player(Player &player);
     };
 
     using GameState =
@@ -213,17 +215,17 @@ struct MovePlayer {
 };
 
 struct SpawnFood {
-	int x;
-	int y;
+    int x;
+    int y;
 };
 
 struct DestroyFood {
-	int x;
-	int y;
+    int x;
+    int y;
 };
 
 struct PlayerGrow {
-	Network::ClientID id;
+    Network::ClientID id;
 };
 
 struct PlayerInput {

@@ -150,6 +150,8 @@ sf::Color SnakeGame::get_random_color() {
 }
 
 void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
+    s.network.print_stats();
+
     for (auto &[id, player] : s.players) {
         player.send_buffer.reset();
     }
@@ -194,10 +196,7 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
         auto &player = it->second;
         using namespace SnakeNetwork;
         if (id != s.local_id) {
-
-            //printf("Receiving ... ");
             if (s.network.recv(recv_buffer, id)) {
-                //printf("%u bytes\n", recv_buffer.bytes.size());
                 Message msg;
                 while (!recv_buffer.empty()) {
                     recv_buffer.read(msg);
@@ -244,6 +243,7 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
                     tplayer.send_buffer.write(msg);
                 }
             }
+
         } else {
             ++it;
         }
@@ -256,7 +256,7 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
     for (auto &[id, player] : s.players) {
         if (id == s.local_id)
             continue;
-        // printf("sending %u bytes to %u\n", player.send_buffer.bytes.size(), id);
+
         s.network.send(player.send_buffer, id);
     }
 
@@ -275,6 +275,9 @@ void SnakeGame::host_lobby(HostLobby &s, Input &input, float dt) {
 }
 
 void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
+
+    s.network.print_stats();
+
     using namespace SnakeNetwork;
     Message msg;
     s.send_buffer.reset();
@@ -303,13 +306,13 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
             s.send_buffer.write(msg);
         }
 
-		if (s.game_running) {
-			s.game_tick(input, dt);
-		}
+        if (s.game_running) {
+            s.game_tick(input, dt);
+        }
 
-        s.network.send(s.send_buffer);
+        s.network.send(s.send_buffer, 0);
 
-        if (s.network.recv(recv_buffer)) {
+        if (s.network.recv(recv_buffer, 0)) {
             while (!recv_buffer.empty()) {
                 recv_buffer.read(msg);
                 if (auto m = std::get_if<JoinResponse>(&msg.body)) {
@@ -320,10 +323,9 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
                     printf("Received NewPlayer\n");
                     auto p = s.add_player(m->id);
                     p->ready = m->ready;
-                } else if (auto m =
-                                std::get_if<ServerSetReady>(&msg.body)) {
-                    printf("Received ServerSetReady (v=%d id=%d)\n",
-                            m->ready, m->id);
+                } else if (auto m = std::get_if<ServerSetReady>(&msg.body)) {
+                    printf("Received ServerSetReady (v=%d id=%d)\n", m->ready,
+                           m->id);
                     auto &p = s.players.at(m->id);
                     p.ready = m->ready;
                 } else if (auto m = std::get_if<PlayerLeft>(&msg.body)) {
@@ -337,12 +339,10 @@ void SnakeGame::guest_lobby(GuestLobby &s, Input &input, float dt) {
                     p.ready = m->ready;
                 } else if (auto m = std::get_if<StartGame>(&msg.body)) {
                     s.game_running = true;
-				}
-				else {
-					s.msgs.push_back(msg);
-				}
+                } else {
+                    s.msgs.push_back(msg);
+                }
             }
-			
 
         } else {
             state.emplace<MainMenu>();
@@ -669,16 +669,29 @@ void SnakeGame::HostLobby::add_food(int x, int y) {
         auto f = new Food{x, y};
         game.world_map(x, y).food = f;
         game.food.push_back(f);
-		using namespace SnakeNetwork;
-		Message msg;
-		msg.body = SpawnFood{ x, y };
-		send_all(msg);
+        using namespace SnakeNetwork;
+        Message msg;
+        msg.body = SpawnFood{x, y};
+        send_all(msg);
     }
+}
+
+void SnakeGame::HostLobby::grow_player(SnakeGame::Player &player) {
+    for (int i = 0; i < game.foodGrowth; ++i) {
+        if (player.body.size() < 50) {
+            player.body.push_back(player.body.back());
+        }
+    }
+
+    using namespace SnakeNetwork;
+    Message msg;
+    msg.body = PlayerGrow{player.id};
+    send_all(msg);
 }
 
 SnakeGame::GuestLobby::GuestLobby(SnakeGame &game) : game(game) {
     game.world_map.resize(game.gridCols, game.gridRows);
-	
+
     network.connect();
 }
 
@@ -802,13 +815,9 @@ void SnakeGame::HostLobby::game_tick(Input &input, float dt) {
         for (auto it = game.food.begin(); it != game.food.end();) {
             auto f = *it;
             if (player.body[0] == f->p) {
-                /*for (int i = 0; i < game.foodGrowth; ++i) {
-                    if (player.body.size() < 50) {
-                        player.body.push_back(player.body.back());
-                    }
-                }*/
-				msg.body = DestroyFood{ f->p.x, f->p.y };
-				send_all(msg);
+                grow_player(player);
+                msg.body = DestroyFood{f->p.x, f->p.y};
+                send_all(msg);
                 game.world_map((*it)->p.x, (*it)->p.y).food = nullptr;
                 it = game.food.erase(it);
                 delete f;
@@ -817,24 +826,22 @@ void SnakeGame::HostLobby::game_tick(Input &input, float dt) {
             }
         }
 
-        if (game.foodRegrowCount++ >= game.foodRegrow && game.food.size() < 10) {
+        if (game.foodRegrowCount++ >= game.foodRegrow &&
+            game.food.size() < 10) {
             add_food(rand() % game.gridCols, rand() % game.gridRows);
             game.foodRegrowCount = 0;
         }
 
-        //        bool collision = false;
-        //        for (auto &[id_test, player_test] : s.players) {
-        //            if (on_player(player, player_test)) {
-        //                collision = true;
-        //                break;
-        //            }
-        //        }
-        //        if (collision) {
-        //            add_message("You died! Do no eat snakes.\n"
-        //                        "Final score: %d",
-        //                        player.body.size() - 3);
-        //            player.dead = true;
-        //        }
+        bool collision = false;
+        for (auto &[id_test, player_test] : players) {
+            if (game.on_player(player, player_test)) {
+                collision = true;
+                break;
+            }
+        }
+        if (collision) {
+            player.dead = true;
+        }
     }
 
     for (auto &[id, player] : players) {
@@ -869,7 +876,6 @@ SnakeGame::Direction SnakeGame::HostLobby::set_dir(SnakeGame::Player &player,
 void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
     using namespace SnakeNetwork;
     Message msg;
-    // printf("%d input events\n", input.events.size());
     for (auto &ev : input.events) {
         auto &player = players.at(local_id);
         if (auto e = std::get_if<Input::KeyPressed>(&ev)) {
@@ -885,14 +891,10 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
         msg.body.emplace<HeartBeat>();
         send_buffer.write(msg);
     }
-    // printf("Sending %d bytes\n", send_buffer.bytes.size());
-    // network.send(send_buffer);
 
-    // printf("Receiving ... ");
     while (!msgs.empty()) {
-        // printf("%d bytes\n", game.recv_buffer.bytes.size());
-		Message msg(msgs.front());
-		msgs.pop_front();
+        Message msg(msgs.front());
+        msgs.pop_front();
         if (auto m = std::get_if<MovePlayer>(&msg.body)) {
             auto &player = players.at(m->id);
             player.dir = m->dir;
@@ -900,7 +902,7 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
                 player.body[i].x = player.body[i - 1].x;
                 player.body[i].y = player.body[i - 1].y;
             }
-			
+
             switch (player.dir) {
             case Direction::Down:
                 player.body[0].y++;
@@ -916,20 +918,19 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
                 break;
             }
         } else if (auto m = std::get_if<SpawnPlayer>(&msg.body)) {
-			printf("Received SpawnPlayer %u\n", m->id);
-			auto &p = players.at(m->id);
-			spawn(p);
-		}
-		else if (auto m = std::get_if<SpawnFood>(&msg.body)) {
-			printf("Received SpawnFood %2d %2d\n", m->x, m->y);
-			add_food(m->x, m->y);
-		}
-		else if (auto m = std::get_if<DestroyFood>(&msg.body)) {
-			printf("Received DestroyFood %2d %2d\n", m->x, m->y);
-			
-			remove_food(m->x, m->y);
-		}
-        
+            // printf("Received SpawnPlayer %u\n", m->id);
+            auto &p = players.at(m->id);
+            spawn(p);
+        } else if (auto m = std::get_if<SpawnFood>(&msg.body)) {
+            // printf("Received SpawnFood %2d %2d\n", m->x, m->y);
+            add_food(m->x, m->y);
+        } else if (auto m = std::get_if<DestroyFood>(&msg.body)) {
+            // printf("Received DestroyFood %2d %2d\n", m->x, m->y);
+            remove_food(m->x, m->y);
+        } else if (auto m = std::get_if<PlayerGrow>(&msg.body)) {
+            auto &p = players.at(m->id);
+            grow_player(p);
+        }
     }
 
     //    for (auto &[id, player] : s.players) {
@@ -1024,23 +1025,13 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
     //        }
     //    }
 
-	for (auto f : game.food) {
-		game.food_shape.setPosition(f->p.x * game.gridSize, f->p.y * game.gridSize); 
-		window->draw(game.food_shape); 
-	}
+    for (auto f : game.food) {
+        game.food_shape.setPosition(f->p.x * game.gridSize,
+                                    f->p.y * game.gridSize);
+        window->draw(game.food_shape);
+    }
 
     for (auto &[id, player] : players) {
-        //        if (player.body[0].x < 0 || player.body[0].x >= gridCols ||
-        //            player.body[0].y < 0 || player.body[0].y >= gridRows) {
-        //            add_message("You died! Do no try to go out of the playing
-        //            field.\n"
-        //                        "Final score: %d",
-        //                        player.body.size() - 3);
-        //            player.dead = true;
-        //        }
-
-        //        
-
         int n = 0;
         for (auto [x, y] : player.body) {
 
@@ -1107,14 +1098,6 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
     //    }
 }
 
-void SnakeGame::GuestLobby::decompose(SnakeGame::Player &player) {
-    for (size_t i = 1; i < player.body.size(); ++i) {
-        add_food(player.body[i].x, player.body[i].y);
-    }
-
-    player.input_buffer.clear();
-}
-
 void SnakeGame::GuestLobby::add_food(int x, int y) {
     if (game.world_map(x, y).food == nullptr) {
         auto f = new Food{x, y};
@@ -1124,11 +1107,19 @@ void SnakeGame::GuestLobby::add_food(int x, int y) {
 }
 
 void SnakeGame::GuestLobby::remove_food(int x, int y) {
-	auto f = game.world_map(x, y).food;
-	if (f != nullptr) {
-		std::remove_if(game.food.begin(), game.food.end(),
-			[f](auto food_p) { return food_p == f; });
-		delete f;
-	}
-	game.world_map(x, y).food = nullptr;
+    auto f = game.world_map(x, y).food;
+    if (f != nullptr) {
+        std::remove_if(game.food.begin(), game.food.end(),
+                       [f](auto food_p) { return food_p == f; });
+        delete f;
+    }
+    game.world_map(x, y).food = nullptr;
+}
+
+void SnakeGame::GuestLobby::grow_player(SnakeGame::Player &player) {
+    for (int i = 0; i < game.foodGrowth; ++i) {
+        if (player.body.size() < 50) {
+            player.body.push_back(player.body.back());
+        }
+    }
 }

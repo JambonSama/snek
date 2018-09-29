@@ -2,8 +2,9 @@
 #include "engine.h"
 #include "stable_win32.hpp"
 
-static constexpr auto PORT = "5678";
-static constexpr auto PORTN = 5678;
+static constexpr auto PORT = "5677";
+static constexpr auto PORTN = 5677;
+static constexpr auto IP = "localhost";
 
 Network::Client::Client(net::io_context &ctx) : socket(ctx), resolver(ctx) {}
 
@@ -32,17 +33,17 @@ void Network::connect() {
     state.emplace<Client>(ctx);
     auto &client = std::get<Client>(state);
 
-    net::async_connect(
-        client.socket, client.resolver.resolve("192.168.0.248", PORT),
-        [&client](auto ec, auto endpoint) {
-            if (!ec) {
-                add_message("connected to localhost");
-                client.connected = true;
-            } else {
-                add_message("Failed to connect: %s", ec.message().c_str());
-                client.connected = false;
-            }
-        });
+    net::async_connect(client.socket, client.resolver.resolve(IP, PORT),
+                       [&client](auto ec, auto endpoint) {
+                           if (!ec) {
+                               add_message("connected to localhost");
+                               client.connected = true;
+                           } else {
+                               add_message("Failed to connect: %s",
+                                           ec.message().c_str());
+                               client.connected = false;
+                           }
+                       });
 }
 
 void Network::start_server() {
@@ -100,34 +101,50 @@ std::optional<Network::ClientID> Network::get_new_client() {
 }
 
 void Network::send(Buffer &b, ClientID id) {
-    std::lock_guard guard(mutex);
+
     if (auto server = std::get_if<Server>(&state)) {
         auto it = server->clients.find(id);
         if (it != server->clients.end()) {
+            u32 to_send = b.bytes.size();
             std::error_code ec;
+            net::write(it->second.socket,
+                       net::const_buffer(&to_send, sizeof(to_send)), ec);
+
             auto size =
-                net::write(it->second.socket, net::dynamic_buffer(b.bytes), ec);
-            // printf("write %u bytes\n", size);
+                net::write(it->second.socket,
+                           net::const_buffer(b.bytes.data(), to_send), ec);
+            bytes_sent += size + sizeof(to_send);
+            //            printf("write %u / %u bytes\n", size, to_send);
         }
     } else if (auto client = std::get_if<Client>(&state)) {
         std::error_code ec;
-        auto size =
-            net::write(client->socket, net::dynamic_buffer(b.bytes), ec);
-        //        printf("write %u bytes\n", size);
+        u32 to_send = b.bytes.size();
+        net::write(client->socket, net::const_buffer(&to_send, sizeof(to_send)),
+                   ec);
+        auto size = net::write(client->socket,
+                               net::const_buffer(b.bytes.data(), to_send), ec);
+        bytes_sent += size + sizeof(to_send);
+        // printf("write %u / %u bytes\n", size, to_send);
     }
 }
 
 bool Network::recv(Buffer &b, ClientID id) {
-    std::lock_guard guard(mutex);
     b.reset();
 
     if (auto server = std::get_if<Server>(&state)) {
         if (auto it = server->clients.find(id); it != server->clients.end()) {
             auto &client = it->second;
             std::error_code ec;
+            u32 to_read = 0;
+            net::read(client.socket, net::dynamic_buffer(b.bytes),
+                      net::transfer_exactly(sizeof(to_read)));
+            b.read(to_read);
+            // b.reset();
             auto size = net::read(client.socket, net::dynamic_buffer(b.bytes),
-                                  net::transfer_at_least(1), ec);
-            //            printf("read %u bytes\n", size);
+                                  net::transfer_exactly(to_read));
+
+            bytes_received += size + sizeof(to_read);
+            // printf("read %u bytes\n", size);
             if (!ec) {
                 return true;
             } else {
@@ -139,9 +156,15 @@ bool Network::recv(Buffer &b, ClientID id) {
 
     } else if (auto client = std::get_if<Client>(&state)) {
         std::error_code ec;
+        u32 to_read = 0;
+        net::read(client->socket, net::dynamic_buffer(b.bytes),
+                  net::transfer_exactly(sizeof(to_read)));
+        b.read(to_read);
+        // b.reset();
         auto size = net::read(client->socket, net::dynamic_buffer(b.bytes),
-                              net::transfer_at_least(1), ec);
-        //        printf("read %u bytes\n", size);
+                              net::transfer_exactly(to_read));
+
+        bytes_received += size + sizeof(to_read);
         if (!ec) {
             return true;
         } else {
@@ -161,4 +184,10 @@ bool Network::connected() {
         return client->connected;
     }
     return false;
+}
+
+void Network::print_stats() {
+    printf("Network: tx = %3u  rx = %3u\n", bytes_sent, bytes_received);
+    bytes_sent = 0;
+    bytes_received = 0;
 }
