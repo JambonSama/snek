@@ -187,7 +187,10 @@ bool Network::connected() {
 }
 
 void Network::print_stats() {
+#ifdef _DEBUG
     printf("Network: tx = %3u  rx = %3u\n", bytes_sent, bytes_received);
+#endif
     bytes_sent = 0;
     bytes_received = 0;
+
 }

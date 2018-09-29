@@ -1,6 +1,5 @@
 #pragma once
 #include "engine.h"
-#include "net2.h"
 #include "network.h"
 #include "stable_win32.hpp"
 

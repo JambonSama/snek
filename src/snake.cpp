@@ -68,8 +68,8 @@ void SnakeGame::SinglePlayer::add_food(int x, int y) {
 void SnakeGame::SinglePlayer::remove_food(int x, int y) {
     auto f = game.world_map(x, y).food;
     if (f != nullptr) {
-        std::remove_if(game.food.begin(), game.food.end(),
-                       [f](auto food_p) { return food_p == f; });
+        game.food.erase(std::remove_if(game.food.begin(), game.food.end(),
+                       [f](auto food_p) { return food_p == f; }));
         delete f;
     }
     game.world_map(x, y).food = nullptr;
@@ -787,12 +787,7 @@ void SnakeGame::HostLobby::game_tick(Input &input, float dt) {
             player.body[0].y < 0 || player.body[0].y >= game.gridRows) {
             player.dead = true;
         }
-
-        for (auto f : game.food) {
-            game.food_shape.setPosition(f->p.x * game.gridSize,
-                                        f->p.y * game.gridSize);
-            window->draw(game.food_shape);
-        }
+		
 
         int n = 0;
         for (auto [x, y] : player.body) {
@@ -843,6 +838,13 @@ void SnakeGame::HostLobby::game_tick(Input &input, float dt) {
             player.dead = true;
         }
     }
+
+	ui::label(5, 5, "food: %3d", game.food.size());
+	for (auto f : game.food) {
+		game.food_shape.setPosition(f->p.x * game.gridSize,
+			f->p.y * game.gridSize);
+		window->draw(game.food_shape);
+	}
 
     for (auto &[id, player] : players) {
         if (player.dead) {
@@ -1025,6 +1027,7 @@ void SnakeGame::GuestLobby::game_tick(Input &input, float dt) {
     //        }
     //    }
 
+	ui::label(5, 5, "food: %3d", game.food.size());
     for (auto f : game.food) {
         game.food_shape.setPosition(f->p.x * game.gridSize,
                                     f->p.y * game.gridSize);
@@ -1107,10 +1110,12 @@ void SnakeGame::GuestLobby::add_food(int x, int y) {
 }
 
 void SnakeGame::GuestLobby::remove_food(int x, int y) {
+	
     auto f = game.world_map(x, y).food;
+	// printf("RemoveFood %2d %2d  f = %p\n", x, y, f);
     if (f != nullptr) {
-        std::remove_if(game.food.begin(), game.food.end(),
-                       [f](auto food_p) { return food_p == f; });
+        game.food.erase(std::remove_if(game.food.begin(), game.food.end(),
+                       [f](auto food_p) { return food_p == f; }));
         delete f;
     }
     game.world_map(x, y).food = nullptr;

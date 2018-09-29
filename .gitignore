@@ -74,3 +74,7 @@ Thumbs.db
 /vs/.vs/snek/v15
 /vs/x64/Debug/snek.tlog
 /snek.7z
+/vs/x64/Release/snek.tlog
+/vs/x64/Release
+*.psess
+*.vspx
