@@ -10,7 +10,7 @@ LIBS += -lpthread -lclang
 
 # QMAKE_LINK += -fxray-instrument -fxray-instruction-threshold=1
 # QMAKE_CXXFLAGS += -fxray-instrument -fxray-instruction-threshold=1
-QMAKE_CXXFLAGS += -fmodules-ts
+QMAKE_CXXFLAGS += -fcoroutines-ts
 
 
 SOURCES += \

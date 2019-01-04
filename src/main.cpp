@@ -3,6 +3,8 @@
 #include "snake.h"
 #include "stable_win32.hpp"
 
+#include <experimental/coroutine>
+
 #ifdef _WIN32
 #ifdef _DEBUG
 #pragma comment(lib, "sfml-graphics-d.lib")
@@ -269,7 +271,12 @@ void draw_messages() {
 
 #include <utility>
 
+int test() {
+    co_return(42);
+}
+
 int main() {
+
     // Set stdout to unbuffered (auto stdout flush)
     setvbuf(stdout, NULL, _IONBF, 0);
     SnakeGame snake;
@@ -279,7 +286,7 @@ int main() {
     window->setFramerateLimit(60);
     // window->setVerticalSyncEnabled(true);
 
-    message_font.loadFromFile("resources/fonts/Inconsolata-Regular.ttf");
+    message_font.loadFromFile("./resources/fonts/Inconsolata-Regular.ttf");
     message_text.setFont(message_font);
     ui::label_text.setFont(message_font);
 
